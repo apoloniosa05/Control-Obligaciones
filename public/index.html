@@ -1,0 +1,2140 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Obligaciones Fiscales - MACH Contadores Públicos</title>
+    
+    <!-- Theme (día / noche) antes de pintar para evitar parpadeo -->
+    <script>
+        (function () {
+            var saved = localStorage.getItem('theme');
+            var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.classList.toggle('dark', dark);
+            document.documentElement.classList.toggle('light', !dark);
+        })();
+    </script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts: Plus Jakarta Sans, Inter, Space Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        heading: ['Plus Jakarta Sans', 'sans-serif'],
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Space Mono', 'monospace']
+                    },
+                    colors: {
+                        navy: {
+                            50: '#F0F3FF',
+                            100: '#E0E7FF',
+                            800: '#1E293B',
+                            900: '#0F172A',
+                            950: '#020617',
+                        },
+                        violetBrand: {
+                            500: '#6366F1',
+                            600: '#4F46E5',
+                            700: '#4338CA',
+                        },
+                        cyanBrand: {
+                            400: '#22D3EE',
+                            500: '#06B6D4',
+                            600: '#0891B2',
+                        },
+                        satEmerald: {
+                            50: '#ECFDF5',
+                            100: '#D1FAE5',
+                            500: '#10B981',
+                            600: '#059669',
+                        },
+                        satAmber: {
+                            50: '#FFFBEB',
+                            100: '#FEF3C7',
+                            500: '#F59E0B',
+                            600: '#D97706',
+                        },
+                        satCrimson: {
+                            50: '#FEF2F2',
+                            100: '#FEE2E2',
+                            500: '#EF4444',
+                            600: '#DC2626',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top right, rgba(224, 231, 255, 0.4), transparent 40%),
+                        radial-gradient(circle at bottom left, rgba(207, 250, 254, 0.3), transparent 50%),
+                        #F8FAFC;
+            background-attachment: fixed;
+        }
+
+        h1, h2, h3, h4, h5, h6, .font-heading {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        .font-mono {
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* Glassmorphism & SaaS Card Glow Effects */
+        .saas-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.03), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .saas-card:hover {
+            box-shadow: 0 12px 30px -8px rgba(79, 70, 229, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+            border-color: rgba(199, 210, 254, 0.9);
+            transform: translateY(-2px);
+        }
+
+        /* Pulse glow animation for overdue / urgent items */
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+        }
+
+        .pulse-overdue {
+            animation: pulseGlow 2s infinite;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(241, 245, 249, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8;
+        }
+
+        /* Sidebar transition */
+        .sidebar-expanded { width: 260px; }
+        .sidebar-collapsed { width: 80px; }
+        .sidebar-collapsed .sidebar-text { display: none; }
+        .sidebar-collapsed .sidebar-center { justify-content: center; }
+        .sidebar-collapsed .sidebar-header { justify-content: center; padding-left: 0; padding-right: 0; }
+
+        /* ===== Modo noche ===== */
+        html.dark { color-scheme: dark; }
+        html.dark body {
+            background: radial-gradient(circle at top right, rgba(79, 70, 229, 0.12), transparent 40%),
+                        radial-gradient(circle at bottom left, rgba(8, 145, 178, 0.10), transparent 50%),
+                        #0B1120;
+            background-attachment: fixed;
+            color: #CBD5E1;
+        }
+        html.dark .saas-card {
+            background: rgba(17, 24, 39, 0.85);
+            border-color: rgba(51, 65, 85, 0.8);
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+        }
+        html.dark .saas-card:hover { border-color: rgba(99, 102, 241, 0.5); }
+
+        html.dark .bg-white { background-color: #111827; }
+        html.dark .bg-white\/90 { background-color: rgba(17, 24, 39, 0.9); }
+        html.dark .bg-white\/70 { background-color: rgba(11, 17, 32, 0.75); }
+        html.dark .bg-slate-50, html.dark .bg-slate-50\/90 { background-color: #1E293B; }
+        html.dark .bg-slate-100 { background-color: #1E293B; }
+        html.dark .bg-slate-200 { background-color: #334155; }
+        html.dark .bg-indigo-50, html.dark .bg-indigo-50\/90 { background-color: rgba(99, 102, 241, 0.15); }
+        html.dark .bg-indigo-50\/40 { background-color: rgba(99, 102, 241, 0.08); }
+        html.dark .bg-indigo-100, html.dark .bg-violet-100 { background-color: rgba(99, 102, 241, 0.25); }
+        html.dark .bg-emerald-50, html.dark .bg-emerald-50\/40 { background-color: rgba(16, 185, 129, 0.12); }
+        html.dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.22); }
+        html.dark .bg-amber-50, html.dark .bg-amber-50\/40 { background-color: rgba(245, 158, 11, 0.12); }
+        html.dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.22); }
+        html.dark .bg-red-50, html.dark .bg-red-50\/40 { background-color: rgba(239, 68, 68, 0.12); }
+        html.dark .bg-red-100 { background-color: rgba(239, 68, 68, 0.22); }
+        html.dark .from-indigo-50 { --tw-gradient-from: rgba(99, 102, 241, 0.15) var(--tw-gradient-from-position); --tw-gradient-to: transparent var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+        html.dark .to-cyan-50 { --tw-gradient-to: rgba(6, 182, 212, 0.10) var(--tw-gradient-to-position); }
+
+        html.dark .hover\:bg-slate-50:hover, html.dark .hover\:bg-slate-50\/80:hover,
+        html.dark .hover\:bg-slate-100:hover, html.dark .hover\:bg-slate-100\/80:hover { background-color: #1E293B; }
+        html.dark .hover\:bg-slate-200:hover { background-color: #334155; }
+        html.dark .hover\:bg-indigo-50:hover, html.dark .hover\:bg-indigo-100:hover { background-color: rgba(99, 102, 241, 0.25); }
+        html.dark .hover\:bg-emerald-100:hover { background-color: rgba(16, 185, 129, 0.25); }
+        html.dark .hover\:bg-amber-100:hover { background-color: rgba(245, 158, 11, 0.25); }
+        html.dark .hover\:bg-red-100:hover { background-color: rgba(239, 68, 68, 0.25); }
+
+        html.dark .text-navy-900, html.dark .hover\:text-navy-900:hover, html.dark .text-slate-800 { color: #F1F5F9; }
+        html.dark .text-slate-700 { color: #CBD5E1; }
+        html.dark .text-slate-600 { color: #94A3B8; }
+        html.dark .text-slate-500 { color: #8B9AB0; }
+        html.dark .text-slate-400 { color: #64748B; }
+        html.dark .text-slate-300 { color: #475569; }
+        html.dark .text-indigo-700 { color: #A5B4FC; }
+        html.dark .text-indigo-600, html.dark .hover\:text-indigo-600:hover { color: #818CF8; }
+        html.dark .text-emerald-700 { color: #6EE7B7; }
+        html.dark .text-emerald-600 { color: #34D399; }
+        html.dark .text-amber-800, html.dark .text-amber-700 { color: #FCD34D; }
+        html.dark .text-amber-600 { color: #FBBF24; }
+        html.dark .text-red-700 { color: #FCA5A5; }
+        html.dark .text-red-600 { color: #F87171; }
+        html.dark .text-cyan-600 { color: #22D3EE; }
+
+        html.dark .border-slate-100, html.dark .border-slate-200, html.dark .border-slate-200\/60,
+        html.dark .border-slate-200\/80, html.dark .border-slate-200\/90, html.dark .border-white { border-color: #1F2937; }
+        html.dark .border-slate-300, html.dark .hover\:border-slate-300:hover { border-color: #334155; }
+        html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #1F2937; }
+        html.dark .border-indigo-100, html.dark .border-indigo-100\/80, html.dark .border-indigo-200 { border-color: rgba(99, 102, 241, 0.35); }
+        html.dark .border-emerald-100, html.dark .border-emerald-200, html.dark .border-emerald-200\/80 { border-color: rgba(16, 185, 129, 0.35); }
+        html.dark .border-amber-100, html.dark .border-amber-200, html.dark .border-amber-200\/80 { border-color: rgba(245, 158, 11, 0.35); }
+        html.dark .border-red-200, html.dark .border-red-200\/80 { border-color: rgba(239, 68, 68, 0.35); }
+
+        html.dark input, html.dark select, html.dark textarea { color: #E2E8F0; }
+        html.dark select option { background-color: #111827; color: #E2E8F0; }
+        html.dark input::placeholder, html.dark textarea::placeholder { color: #64748B; }
+        html.dark ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        html.dark ::-webkit-scrollbar-thumb { background: #334155; }
+    </style>
+</head>
+<body class="text-slate-700 min-h-screen antialiased overflow-x-hidden">
+
+    <!-- ========================================== -->
+    <!-- 1. PANTALLA DE AUTENTICACIÓN (LOGIN & REGISTRO) -->
+    <!-- ========================================== -->
+    <div id="authScreen" class="min-h-screen w-full flex items-center justify-center p-4 relative z-50">
+        <!-- Floating Theme Switcher en Auth -->
+        <div class="absolute top-5 right-5">
+            <button onclick="toggleTheme()" class="w-10 h-10 bg-white hover:bg-slate-50 text-slate-700 rounded-xl border border-slate-200 shadow-md transition flex items-center justify-center" title="Cambiar a modo noche" aria-label="Cambiar a modo noche">
+                <i class="authThemeIcon fa-solid fa-moon text-indigo-600"></i>
+            </button>
+        </div>
+
+        <div class="saas-card w-full max-w-md p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-2xl relative overflow-hidden backdrop-blur-2xl">
+            <!-- Decorative Glow Backgrounds -->
+            <div class="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -left-10 -bottom-10 w-40 h-40 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+            <!-- Brand Header -->
+            <div class="text-center mb-6">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 text-white flex items-center justify-center font-extrabold text-2xl shadow-xl shadow-indigo-500/30 mx-auto mb-3">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <h1 class="text-2xl font-black text-navy-900 tracking-tight font-heading">FiscalControl</h1>
+                <p class="text-[11px] font-bold text-cyan-600 uppercase tracking-widest mt-1">MACH Contadores Públicos</p>
+                <p class="text-xs text-slate-500 mt-1">Control de Obligaciones Fiscales • SAT 2026</p>
+            </div>
+
+            <!-- Tab Switcher (Iniciar Sesión / Registrarse) -->
+            <div class="flex bg-slate-100 p-1 rounded-xl mb-6">
+                <button type="button" id="tabBtnLogin" onclick="switchAuthTab('login')" class="flex-1 py-2 text-xs font-extrabold rounded-lg transition bg-white text-indigo-700 shadow-sm font-heading flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
+                </button>
+                <button type="button" id="tabBtnRegister" onclick="switchAuthTab('register')" class="flex-1 py-2 text-xs font-extrabold rounded-lg transition text-slate-500 hover:text-navy-900 font-heading flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-user-plus"></i> Registrarse
+                </button>
+            </div>
+
+            <!-- FORMULARIO: INICIAR SESIÓN -->
+            <form id="formLogin" onsubmit="handleAuthLogin(event)" class="space-y-4">
+                <div id="loginAlert" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-medium flex items-center gap-2">
+                    <i class="fa-solid fa-circle-exclamation text-sm shrink-0"></i>
+                    <span id="loginAlertMsg">Error al iniciar sesión</span>
+                </div>
+
+                <div>
+                    <label class="block text-slate-700 font-bold text-xs mb-1 font-heading">Correo Electrónico</label>
+                    <div class="relative">
+                        <i class="fa-regular fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                        <input type="email" id="loginEmail" required placeholder="tu.correo@machcontadores.mx" class="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-navy-900 focus:outline-none focus:border-indigo-600 transition">
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-slate-700 font-bold text-xs font-heading">Contraseña</label>
+                        <a href="javascript:void(0)" onclick="quickDemoLogin()" class="text-[11px] font-bold text-indigo-600 hover:underline">¿Usar cuenta demo?</a>
+                    </div>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                        <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-navy-900 focus:outline-none focus:border-indigo-600 transition">
+                        <button type="button" onclick="togglePasswordVisibility('loginPassword', 'loginEyeIcon')" class="absolute right-3.5 top-3 text-slate-400 hover:text-navy-900">
+                            <i id="loginEyeIcon" class="fa-regular fa-eye text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-xs pt-1">
+                    <label class="flex items-center gap-2 text-slate-600 cursor-pointer">
+                        <input type="checkbox" id="loginRemember" checked class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer">
+                        <span>Recordar sesión</span>
+                    </label>
+                </div>
+
+                <button type="submit" id="loginSubmitBtn" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-extrabold text-xs rounded-xl transition shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 font-heading">
+                    <span id="loginBtnText">Iniciar Sesión</span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                </button>
+
+                <!-- Acceso Rápido Administrador Demo -->
+                <button type="button" onclick="quickDemoLogin()" class="w-full py-2.5 px-4 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/60 hover:bg-indigo-100/60 text-indigo-700 text-xs font-bold transition flex items-center justify-center gap-2 font-heading">
+                    <i class="fa-solid fa-bolt text-amber-500"></i> Acceso Rápido Administrador Demo
+                </button>
+            </form>
+
+            <!-- FORMULARIO: REGISTRO DE USUARIO -->
+            <form id="formRegister" onsubmit="handleAuthRegister(event)" class="space-y-3.5 hidden">
+                <div id="registerAlert" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-medium flex items-center gap-2">
+                    <i class="fa-solid fa-circle-exclamation text-sm shrink-0"></i>
+                    <span id="registerAlertMsg">Error al registrar usuario</span>
+                </div>
+
+                <div>
+                    <label class="block text-slate-700 font-bold text-xs mb-1 font-heading">Nombre Completo</label>
+                    <div class="relative">
+                        <i class="fa-regular fa-user absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                        <input type="text" id="regName" required placeholder="CP Edgar Manuel Mariscal" class="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-navy-900 focus:outline-none focus:border-indigo-600 transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-700 font-bold text-xs mb-1 font-heading">Correo Electrónico</label>
+                    <div class="relative">
+                        <i class="fa-regular fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                        <input type="email" id="regEmail" required placeholder="edgar@machcontadores.mx" class="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-navy-900 focus:outline-none focus:border-indigo-600 transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-slate-700 font-bold text-xs mb-1 font-heading">Rol / Función</label>
+                        <select id="regRole" class="w-full py-2 px-2.5 bg-white border border-slate-200 rounded-xl text-xs text-navy-900 font-medium focus:outline-none focus:border-indigo-600">
+                            <option value="accountant">Contador Titular</option>
+                            <option value="assistant">Contador Asistente</option>
+                            <option value="fiscal">Auxiliar Fiscal</option>
+                            <option value="auditor">Auditor</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-700 font-bold text-xs mb-1 font-heading">Despacho</label>
+                        <input type="text" readonly value="MACH Contadores" class="w-full py-2 px-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-500 font-medium">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-700 font-bold text-xs mb-1 font-heading">Contraseña (mín. 6 car.)</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                        <input type="password" id="regPassword" required minlength="6" placeholder="Mínimo 6 caracteres" class="w-full pl-9 pr-10 py-2 bg-white border border-slate-200 rounded-xl text-xs text-navy-900 focus:outline-none focus:border-indigo-600 transition">
+                        <button type="button" onclick="togglePasswordVisibility('regPassword', 'regEyeIcon1')" class="absolute right-3.5 top-2.5 text-slate-400 hover:text-navy-900">
+                            <i id="regEyeIcon1" class="fa-regular fa-eye text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-700 font-bold text-xs mb-1 font-heading">Confirmar Contraseña</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock-open absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                        <input type="password" id="regPasswordConfirm" required minlength="6" placeholder="Repite la contraseña" class="w-full pl-9 pr-10 py-2 bg-white border border-slate-200 rounded-xl text-xs text-navy-900 focus:outline-none focus:border-indigo-600 transition">
+                        <button type="button" onclick="togglePasswordVisibility('regPasswordConfirm', 'regEyeIcon2')" class="absolute right-3.5 top-2.5 text-slate-400 hover:text-navy-900">
+                            <i id="regEyeIcon2" class="fa-regular fa-eye text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" id="registerSubmitBtn" class="w-full py-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-700 hover:to-indigo-700 text-white font-extrabold text-xs rounded-xl transition shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 font-heading">
+                    <span id="registerBtnText">Crear Mi Cuenta e Ingresar</span>
+                    <i class="fa-solid fa-user-check text-xs"></i>
+                </button>
+
+                <p class="text-center text-[11px] text-slate-500 pt-1">
+                    ¿Ya tienes cuenta? 
+                    <a href="javascript:void(0)" onclick="switchAuthTab('login')" class="font-bold text-indigo-600 hover:underline">Inicia sesión</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. APLICACIÓN PRINCIPAL (AUTENTICADA) -->
+    <!-- ========================================== -->
+    <div id="mainAppWrapper" class="min-h-screen antialiased flex flex-col md:flex-row w-full overflow-x-hidden hidden">
+
+        <aside id="sidebar" class="sidebar-expanded bg-white/90 backdrop-blur-xl border-r border-slate-200/80 flex flex-col justify-between transition-all duration-300 z-40 sticky top-0 h-screen shrink-0 shadow-sm">
+            <div>
+                <!-- Sidebar Header & Logo -->
+                <div class="p-5 border-b border-slate-100 flex items-center justify-between gap-2 sidebar-header">
+                    <div class="flex items-center gap-3 sidebar-center sidebar-text">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 text-white flex items-center justify-center font-extrabold text-lg shadow-md shadow-indigo-500/20 shrink-0">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <div class="sidebar-text">
+                            <h1 class="font-extrabold text-navy-900 text-sm tracking-tight leading-none">FiscalControl</h1>
+                            <span class="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">MACH Contadores Públicos</span>
+                        </div>
+                    </div>
+                    <button onclick="toggleSidebar()" title="Mostrar / ocultar menú" aria-label="Mostrar u ocultar menú" class="text-slate-500 hover:text-navy-900 transition w-9 h-9 flex items-center justify-center rounded-lg hover:bg-slate-100 shrink-0">
+                        <i class="fa-solid fa-bars text-base"></i>
+                    </button>
+                </div>
+
+                <!-- Navigation Links -->
+                <nav class="p-3 space-y-1">
+                    <a href="#" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/80 sidebar-center transition">
+                        <i class="fa-solid fa-chart-pie text-sm text-indigo-600"></i>
+                        <span class="sidebar-text">Dashboard</span>
+                    </a>
+                    <a href="#" onclick="setViewMode('matrix')" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-600 hover:text-navy-900 hover:bg-slate-100/80 sidebar-center transition">
+                        <i class="fa-solid fa-table-cells text-sm text-slate-400"></i>
+                        <span class="sidebar-text">Matriz de Cierre</span>
+                    </a>
+                    <a href="#" onclick="setViewMode('kanban')" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-600 hover:text-navy-900 hover:bg-slate-100/80 sidebar-center transition">
+                        <i class="fa-solid fa-layer-group text-sm text-slate-400"></i>
+                        <span class="sidebar-text">Tablero Kanban</span>
+                    </a>
+                    <a href="#" onclick="setViewMode('expediente')" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-600 hover:text-navy-900 hover:bg-slate-100/80 sidebar-center transition">
+                        <i class="fa-solid fa-address-book text-sm text-slate-400"></i>
+                        <span class="sidebar-text">Clientes 360°</span>
+                    </a>
+                    <a href="#" onclick="openModal('holidaysModal')" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-600 hover:text-navy-900 hover:bg-slate-100/80 sidebar-center transition">
+                        <i class="fa-solid fa-calendar-day text-sm text-slate-400"></i>
+                        <span class="sidebar-text">Calendario SAT</span>
+                    </a>
+                    <a id="navAdminUsers" href="#" onclick="openUsersModal()" class="hidden items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium text-slate-600 hover:text-navy-900 hover:bg-slate-100/80 sidebar-center transition">
+                        <i class="fa-solid fa-users-gear text-sm text-indigo-500"></i>
+                        <span class="sidebar-text">Gestión de Usuarios</span>
+                    </a>
+                </nav>
+            </div>
+
+            <!-- Sidebar Bottom Info & User Profile -->
+            <div class="p-3 border-t border-slate-100 space-y-2">
+                <div class="saas-card p-3 rounded-xl sidebar-text bg-gradient-to-br from-indigo-500/5 to-cyan-500/5">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">Periodo Activo</span>
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    </div>
+                    <div class="text-xs font-extrabold text-navy-900 font-heading">Septiembre 2026</div>
+                    <p class="text-[10px] text-slate-500 mt-0.5">Vencimiento Art. 5.1 CFF</p>
+                </div>
+
+                <!-- Perfil del usuario activo en Sidebar -->
+                <div id="sidebarUserBox" class="saas-card p-3 rounded-xl flex items-center justify-between gap-2.5 border border-slate-200/80">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div id="sidebarUserAvatar" class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                            CP
+                        </div>
+                        <div class="min-w-0 sidebar-text">
+                            <div id="sidebarUserName" class="text-xs font-extrabold text-navy-900 truncate font-heading">Usuario</div>
+                            <div id="sidebarUserRole" class="text-[10px] text-indigo-600 font-bold truncate">Contador</div>
+                        </div>
+                    </div>
+                    <button onclick="handleAuthLogout()" title="Cerrar sesión" class="text-slate-400 hover:text-red-600 transition p-1.5 rounded-lg hover:bg-slate-100 shrink-0">
+                        <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <div class="flex-1 flex flex-col min-w-0 min-h-screen">
+            
+            <!-- Top Navigation / Controls Bar -->
+            <header class="p-4 sm:p-6 pb-2 sticky top-0 z-30 bg-white/70 backdrop-blur-md border-b border-slate-200/60 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-xl sm:text-2xl font-extrabold text-navy-900 tracking-tight font-heading">Control de Obligaciones Fiscales</h2>
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-indigo-700 border border-indigo-200">
+                            SAT 2026
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">Haz 1-clic sobre el semáforo para cambiar el estado rápidamente (Acuse opcional)</p>
+                </div>
+
+                <!-- Global Action Controls -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                    
+                    <!-- Period Switcher -->
+                    <div class="flex items-center bg-white border border-slate-200 p-1.5 rounded-xl shadow-sm text-xs font-bold text-navy-900">
+                        <i class="fa-regular fa-calendar text-indigo-600 px-2"></i>
+                        <select id="periodSelect" onchange="renderApp()" class="bg-transparent focus:outline-none pr-2 cursor-pointer font-heading">
+                            <option value="2026-09">Septiembre 2026</option>
+                            <option value="2026-10">Octubre 2026</option>
+                            <option value="2026-11">Noviembre 2026</option>
+                        </select>
+                    </div>
+
+                    <!-- Backup & JSON Controls -->
+                    <button onclick="exportJSON()" class="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 shadow-sm transition flex items-center gap-1.5" title="Guardar copia JSON">
+                        <i class="fa-solid fa-file-export text-indigo-600"></i>
+                        <span class="hidden sm:inline">Exportar JSON</span>
+                    </button>
+                    <button onclick="document.getElementById('importFile').click()" class="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 shadow-sm transition flex items-center gap-1.5" title="Cargar JSON">
+                        <i class="fa-solid fa-file-import text-cyan-600"></i>
+                        <span class="hidden sm:inline">Importar</span>
+                    </button>
+                    <input type="file" id="importFile" class="hidden" accept=".json" onchange="importJSON(event)">
+
+                    <!-- Theme Toggle -->
+                    <button id="themeToggle" onclick="toggleTheme()" class="w-9 h-9 bg-white hover:bg-slate-50 text-slate-700 rounded-xl border border-slate-200 shadow-sm transition flex items-center justify-center" title="Cambiar a modo noche" aria-label="Cambiar a modo noche">
+                        <i id="themeIcon" class="fa-solid fa-moon text-indigo-600"></i>
+                    </button>
+
+                    <!-- User Chip in Header -->
+                    <div id="headerUserChip" class="hidden sm:flex items-center gap-2 bg-white border border-slate-200 p-1 px-3 rounded-xl shadow-sm text-xs font-bold text-navy-900 font-heading">
+                        <div id="headerUserAvatar" class="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-extrabold flex items-center justify-center">CP</div>
+                        <span id="headerUserName" class="truncate max-w-[120px]">Admin</span>
+                        <span id="headerUserRoleBadge" class="text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100">Admin</span>
+                    </div>
+
+                    <!-- Add New Client Button -->
+                    <button onclick="openModal('newClientModal')" class="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl transition shadow-md shadow-indigo-500/20 flex items-center gap-2 font-heading">
+                        <i class="fa-solid fa-user-plus text-xs"></i>
+                        <span>Nuevo Cliente</span>
+                    </button>
+
+                    <!-- Logout Button -->
+                    <button onclick="handleAuthLogout()" class="px-3 py-2 bg-white hover:bg-red-50 text-slate-600 hover:text-red-600 text-xs font-bold rounded-xl border border-slate-200 shadow-sm transition flex items-center gap-1.5" title="Cerrar sesión">
+                        <i class="fa-solid fa-arrow-right-from-bracket text-red-500"></i>
+                        <span class="hidden sm:inline">Salir</span>
+                    </button>
+                </div>
+            </header>
+
+            <main class="p-4 sm:p-6 space-y-6">
+                
+                <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    
+                    <!-- KPI 1: Total Clients -->
+                    <div class="saas-card p-4 rounded-2xl relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 w-20 h-20 bg-indigo-500/10 rounded-full blur-xl pointer-events-none"></div>
+                        <div class="flex items-center justify-between text-slate-500 mb-2">
+                            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Clientes</span>
+                            <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs">
+                                <i class="fa-solid fa-users"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline justify-between">
+                            <span id="kpiTotalClients" class="text-3xl font-extrabold text-navy-900 font-heading">0</span>
+                            <span class="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">Padrón Activo</span>
+                        </div>
+                    </div>
+
+                    <!-- KPI 2: Compliance Index -->
+                    <div class="saas-card p-4 rounded-2xl relative overflow-hidden border-l-4 border-l-emerald-500">
+                        <div class="flex items-center justify-between text-slate-500 mb-2">
+                            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Cumplimiento Fiscal</span>
+                            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
+                                <i class="fa-solid fa-circle-check"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline justify-between">
+                            <span id="kpiCompleted" class="text-2xl font-extrabold text-navy-900 font-heading">0</span>
+                            <span id="kpiProgressPct" class="text-xs font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- KPI 3: In Process -->
+                    <div class="saas-card p-4 rounded-2xl relative overflow-hidden border-l-4 border-l-amber-500">
+                        <div class="flex items-center justify-between text-slate-500 mb-2">
+                            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">En Proceso</span>
+                            <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xs">
+                                <i class="fa-solid fa-clock"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline justify-between">
+                            <span id="kpiUpcoming" class="text-3xl font-extrabold text-navy-900 font-heading">0</span>
+                            <span class="text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">Por Presentar</span>
+                        </div>
+                    </div>
+
+                    <!-- KPI 4: Overdue & Penalty Risk -->
+                    <div class="saas-card p-4 rounded-2xl relative overflow-hidden border-l-4 border-l-red-500">
+                        <div class="flex items-center justify-between text-slate-500 mb-2">
+                            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Vencidas (Omisos)</span>
+                            <div class="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-xs">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline justify-between">
+                            <span id="kpiOverdue" class="text-3xl font-extrabold text-red-600 font-heading">0</span>
+                            <span id="kpiTotalAmount" class="text-[11px] font-bold font-mono text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-100">$0 MXN</span>
+                        </div>
+                    </div>
+
+                </section>
+
+                <!-- Navigation Tabs: Matrix, Kanban, 360 -->
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+                    <div class="flex items-center bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+                        <button id="tabMatrix" onclick="setViewMode('matrix')" class="flex-1 lg:flex-none px-4 py-2 rounded-lg text-xs font-extrabold transition flex items-center justify-center gap-2 bg-white text-indigo-700 shadow-sm font-heading">
+                            <i class="fa-solid fa-table-cells"></i> Matriz Fiscal
+                        </button>
+                        <button id="tabKanban" onclick="setViewMode('kanban')" class="flex-1 lg:flex-none px-4 py-2 rounded-lg text-xs font-extrabold text-slate-600 hover:text-navy-900 transition flex items-center justify-center gap-2 font-heading">
+                            <i class="fa-solid fa-layer-group"></i> Kanban
+                        </button>
+                        <button id="tabExpediente" onclick="setViewMode('expediente')" class="flex-1 lg:flex-none px-4 py-2 rounded-lg text-xs font-extrabold text-slate-600 hover:text-navy-900 transition flex items-center justify-center gap-2 font-heading">
+                            <i class="fa-solid fa-address-book"></i> Expediente 360°
+                        </button>
+                    </div>
+
+                    <!-- Search and Status Quick Filter -->
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <div class="relative flex-1 sm:w-64">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="searchInput" oninput="handleSearch()" placeholder="Buscar cliente, RFC o contador..." class="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 shadow-sm">
+                        </div>
+                        <select id="statusFilter" onchange="renderApp()" class="text-xs bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-slate-700 font-bold focus:outline-none shadow-sm cursor-pointer">
+                            <option value="ALL">Todos los Estados</option>
+                            <option value="OVERDUE">⚠️ Vencidas</option>
+                            <option value="UPCOMING">⏱ En Proceso</option>
+                            <option value="COMPLETED">✓ Presentadas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- VIEW A: MATRIX -->
+                <section id="viewMatrix" class="saas-card rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200/80 bg-slate-50/50 text-[11px] font-extrabold uppercase text-slate-400 font-heading tracking-wider">
+                                    <th class="p-4">Cliente / Asignado</th>
+                                    <th class="p-4">RFC & Prórroga SAT</th>
+                                    <th class="p-4">Régimen</th>
+                                    <th class="p-4 text-center">ISR Mensual</th>
+                                    <th class="p-4 text-center">IVA Mensual</th>
+                                    <th class="p-4 text-center">DIOT</th>
+                                    <th class="p-4 text-center">Retenciones</th>
+                                    <th class="p-4 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="matrixTableBody" class="divide-y divide-slate-100 text-xs">
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="matrixEmptyState" class="hidden p-8 text-center text-slate-400 text-xs">
+                        <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-300"></i>
+                        <p class="text-xs font-semibold">No se encontraron registros con los filtros actuales.</p>
+                    </div>
+                </section>
+
+                <!-- VIEW B: KANBAN -->
+                <section id="viewKanban" class="grid grid-cols-1 md:grid-cols-3 gap-5 hidden">
+                    
+                    <!-- Columna 1: Vencidas (Omisas) -->
+                    <div class="bg-red-50/40 border border-red-200/80 rounded-2xl p-4 flex flex-col gap-3">
+                        <div class="flex items-center justify-between pb-2 border-b border-red-200/60 font-heading">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                                <h3 class="text-xs font-extrabold text-navy-900 uppercase tracking-wider">Vencidas / Omisas</h3>
+                            </div>
+                            <span id="kanbanCountOverdue" class="px-2 py-0.5 text-xs font-extrabold rounded-full bg-red-100 text-red-700">0</span>
+                        </div>
+                        <div id="kanbanOverdueList" class="space-y-3 min-h-[300px]">
+                            <!-- Cards inserted via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Columna 2: En Proceso -->
+                    <div class="bg-amber-50/40 border border-amber-200/80 rounded-2xl p-4 flex flex-col gap-3">
+                        <div class="flex items-center justify-between pb-2 border-b border-amber-200/60 font-heading">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                                <h3 class="text-xs font-extrabold text-navy-900 uppercase tracking-wider">En Proceso / Por Vencer</h3>
+                            </div>
+                            <span id="kanbanCountUpcoming" class="px-2 py-0.5 text-xs font-extrabold rounded-full bg-amber-100 text-amber-800">0</span>
+                        </div>
+                        <div id="kanbanUpcomingList" class="space-y-3 min-h-[300px]">
+                            <!-- Cards inserted via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Columna 3: Presentadas -->
+                    <div class="bg-emerald-50/40 border border-emerald-200/80 rounded-2xl p-4 flex flex-col gap-3">
+                        <div class="flex items-center justify-between pb-2 border-b border-emerald-200/60 font-heading">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                <h3 class="text-xs font-extrabold text-navy-900 uppercase tracking-wider">Presentadas SAT</h3>
+                            </div>
+                            <span id="kanbanCountCompleted" class="px-2 py-0.5 text-xs font-extrabold rounded-full bg-emerald-100 text-emerald-700">0</span>
+                        </div>
+                        <div id="kanbanCompletedList" class="space-y-3 min-h-[300px]">
+                            <!-- Cards inserted via JS -->
+                        </div>
+                    </div>
+
+                </section>
+
+                <!-- VIEW C: EXPEDIENTE 360 -->
+                <section id="viewExpediente" class="grid grid-cols-1 lg:grid-cols-12 gap-5 hidden">
+                    
+                    <!-- Left Client List Sidebar -->
+                    <div class="lg:col-span-4 saas-card rounded-2xl p-4 max-h-[720px] overflow-y-auto space-y-2.5" id="clientListExpediente">
+                        <!-- Populated via JS -->
+                    </div>
+
+                    <!-- Right Client 360 Detail Card -->
+                    <div class="lg:col-span-8 saas-card rounded-2xl p-6 flex flex-col justify-between" id="clientDetailPanel">
+                        <!-- Populated via JS -->
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 3. MODALES DEL SISTEMA -->
+    <!-- ========================================== -->
+    
+    <!-- MODAL 1: OPTIONAL SAT RECEIPT & REGISTER DETAILS -->
+    <div id="registerModal" class="fixed inset-0 bg-navy-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl p-6 border border-slate-200 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="text-base font-extrabold text-navy-900 font-heading" id="modalClientTitle">Datos de Acuse (Opcional)</h3>
+                    <p class="text-xs font-mono text-indigo-600 font-semibold" id="modalClientRFC">RFC: XXX000000XXX</p>
+                </div>
+                <button onclick="closeModal('registerModal')" class="text-slate-400 hover:text-navy-900 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleRegisterSubmit(event)" class="space-y-4 text-xs">
+                <input type="hidden" id="modalClientId">
+                <input type="hidden" id="modalObligationKey">
+
+                <div>
+                    <label class="block text-slate-700 font-bold mb-1 font-heading">Obligación Fiscal</label>
+                    <input type="text" id="modalObligationName" readonly class="w-full bg-slate-100 border border-slate-200 rounded-xl p-3 font-bold text-navy-900">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-700 font-bold mb-1 font-heading">Estatus de Declaración</label>
+                        <select id="modalStatusSelect" class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-bold text-navy-900 focus:outline-none focus:border-indigo-600">
+                            <option value="COMPLETED">✓ Presentada (Al día)</option>
+                            <option value="UPCOMING">⏱ En Proceso (Pendiente)</option>
+                            <option value="OVERDUE">✕ Vencida (Omiso)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-700 font-bold mb-1 font-heading">Monto Pagado ($ MXN)</label>
+                        <input type="number" id="modalAmount" placeholder="0.00" step="0.01" class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-mono text-navy-900 focus:outline-none focus:border-indigo-600">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-700 font-bold mb-1 font-heading">Número de Operación / Folio SAT (Opcional)</label>
+                    <input type="text" id="modalFolioSAT" placeholder="Ej. 202688192301" class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-mono text-navy-900 focus:outline-none focus:border-indigo-600">
+                </div>
+
+                <!-- Simulating PDF/XML Dropzone -->
+                <div>
+                    <label class="block text-slate-700 font-bold mb-1 font-heading">Adjuntar Acuse PDF / XML (Opcional)</label>
+                    <div class="border-2 border-dashed border-indigo-200 bg-indigo-50/40 rounded-2xl p-5 text-center hover:bg-indigo-50 hover:border-indigo-400 cursor-pointer transition">
+                        <i class="fa-solid fa-cloud-arrow-up text-indigo-600 text-3xl mb-2"></i>
+                        <p class="font-bold text-navy-900">Arrastra o haz clic para adjuntar comprobante</p>
+                        <span class="text-[10px] text-slate-400">Puedes guardar el estatus sin necesidad de adjuntar acuse ahora</span>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex justify-end gap-2.5 font-heading">
+                    <button type="button" onclick="closeModal('registerModal')" class="px-4 py-2.5 font-bold text-slate-500 hover:text-navy-900">Cancelar</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-xl shadow-md shadow-indigo-500/20">Guardar Datos</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ADD NEW CLIENT -->
+    <div id="newClientModal" class="fixed inset-0 bg-navy-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl p-6 border border-slate-200 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="text-base font-extrabold text-navy-900 font-heading">Alta de Nuevo Cliente Fiscal</h3>
+                <button onclick="closeModal('newClientModal')" class="text-slate-400 hover:text-navy-900 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleNewClientSubmit(event)" class="space-y-3.5 text-xs">
+                <div>
+                    <label class="block text-slate-700 font-bold mb-1 font-heading">Razón Social o Nombre Completo</label>
+                    <input type="text" id="newClientName" required placeholder="Ej. Logística Industrial del Centro S.A." class="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-navy-900 focus:outline-none focus:border-indigo-600">
+                </div>
+
+                <div>
+                    <label class="block text-slate-700 font-bold mb-1 font-heading">RFC del Contribuyente</label>
+                    <input type="text" id="newClientRFC" required maxlength="13" placeholder="Ej. LIC1904128A3" class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-mono uppercase text-navy-900 focus:outline-none focus:border-indigo-600">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-700 font-bold mb-1 font-heading">Régimen SAT</label>
+                        <select id="newClientRegimen" class="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-navy-900 font-bold focus:outline-none focus:border-indigo-600">
+                            <option value="601">601 - PM General</option>
+                            <option value="612">612 - PF Act. Empresarial</option>
+                            <option value="626">626 - RESICO Simplificado</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-700 font-bold mb-1 font-heading">Contador Asignado</label>
+                        <select id="newClientAccountant" class="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-navy-900 font-bold focus:outline-none focus:border-indigo-600">
+                            <option value="CP Carlos R.">CP Carlos R.</option>
+                            <option value="CP Ana M.">CP Ana M.</option>
+                            <option value="CP Luis G.">CP Luis G.</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="checkbox" id="newClientEmployees" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer">
+                    <label for="newClientEmployees" class="text-slate-700 font-medium cursor-pointer">Tiene plantilla de empleados (Aplica Retención Nómina)</label>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex justify-end gap-2.5 font-heading">
+                    <button type="button" onclick="closeModal('newClientModal')" class="px-4 py-2.5 font-bold text-slate-500 hover:text-navy-900">Cancelar</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold px-5 py-2.5 rounded-xl shadow-md shadow-indigo-500/20">Registrar Cliente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: SAT HOLIDAYS & CALENDAR -->
+    <div id="holidaysModal" class="fixed inset-0 bg-navy-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl p-6 border border-slate-200 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="text-base font-extrabold text-navy-900 font-heading">Días Inhábiles Oficiales (SAT 2026)</h3>
+                <button onclick="closeModal('holidaysModal')" class="text-slate-400 hover:text-navy-900 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-500">
+                Los días inhábiles oficiales desplazan la fecha límite de vencimiento al siguiente día hábil conforme al Código Fiscal de la Federación (Art. 12 CFF).
+            </p>
+
+            <ul class="space-y-2 text-xs font-mono bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <li class="flex justify-between items-center text-navy-900">
+                    <span>16 Septiembre 2026</span>
+                    <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 font-bold">Aniversario Independencia</span>
+                </li>
+                <li class="flex justify-between items-center text-navy-900">
+                    <span>2 Noviembre 2026</span>
+                    <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 font-bold">Día de Muertos</span>
+                </li>
+                <li class="flex justify-between items-center text-navy-900">
+                    <span>16 Noviembre 2026</span>
+                    <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 font-bold">Revolución Mexicana</span>
+                </li>
+            </ul>
+
+            <div class="pt-2 flex justify-end font-heading">
+                <button onclick="closeModal('holidaysModal')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl">Entendido</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: GESTIÓN DE USUARIOS (ADMINISTRADOR) -->
+    <div id="usersModal" class="fixed inset-0 bg-navy-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-2xl rounded-2xl p-6 border border-slate-200 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">
+                        <i class="fa-solid fa-users-gear"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-extrabold text-navy-900 font-heading">Gestión de Usuarios y Accesos</h3>
+                        <p class="text-xs text-slate-500">Administración de cuentas con acceso al padrón fiscal</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('usersModal')" class="text-slate-400 hover:text-navy-900 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="overflow-x-auto max-h-[360px]">
+                <table class="w-full text-left text-xs">
+                    <thead class="text-[10px] uppercase text-slate-400 font-bold border-b border-slate-100">
+                        <tr>
+                            <th class="py-2.5 px-3">Usuario</th>
+                            <th class="py-2.5 px-3">Correo</th>
+                            <th class="py-2.5 px-3">Rol</th>
+                            <th class="py-2.5 px-3 text-center">Estado</th>
+                            <th class="py-2.5 px-3 text-right">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody" class="divide-y divide-slate-100">
+                        <!-- Populated dynamically via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 flex justify-between items-center text-xs font-heading">
+                <span class="text-slate-400 text-[11px]"><i class="fa-solid fa-shield-halved text-indigo-500 mr-1"></i> Control de acceso basado en roles SAT</span>
+                <button onclick="closeModal('usersModal')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-5 py-2 rounded-xl">Entendido</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION FEEDBACK -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-navy-900 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-2xl transition-all duration-300 opacity-0 pointer-events-none translate-y-2 flex items-center gap-2.5 z-50">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+        <span id="toastMsg">Operación realizada con éxito</span>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 4. LÓGICA JAVASCRIPT INTEGRAL -->
+    <!-- ========================================== -->
+    <script>
+        // INITIAL MOCK DATABASE
+        const INITIAL_CLIENTS = [
+            {
+                id: 'C1',
+                name: 'Edgar Manuel Mariscal Patiño',
+                rfc: 'MAPE760109LJ3',
+                regimen: '612',
+                regimenDesc: 'PF Actividad Empresarial',
+                hasEmployees: true,
+                accountant: 'CP Ana M.',
+                obligations: {
+                    isr: { name: 'ISR Actividad Empresarial', status: 'COMPLETED', folio: 'SAT-992182', amount: 4500.00 },
+                    iva: { name: 'IVA Mensual', status: 'COMPLETED', folio: 'SAT-992183', amount: 3200.00 },
+                    diot: { name: 'DIOT Informativa', status: 'COMPLETED', folio: 'SAT-992184', amount: 0 },
+                    ret: { name: 'Retención ISR Nómina', status: 'COMPLETED', folio: 'SAT-992185', amount: 1200.00 }
+                }
+            },
+            {
+                id: 'C2',
+                name: 'Servicios Digitales Alpha S.A.',
+                rfc: 'SDA1804129K2',
+                regimen: '601',
+                regimenDesc: 'Personas Morales General',
+                hasEmployees: false,
+                accountant: 'CP Carlos R.',
+                obligations: {
+                    isr: { name: 'ISR Pago Provisional PM', status: 'COMPLETED', folio: 'SAT-882100', amount: 18500.00 },
+                    iva: { name: 'IVA Declaración Mensual', status: 'OVERDUE', folio: '', amount: 8400.00 },
+                    diot: { name: 'DIOT Informativa', status: 'UPCOMING', folio: '', amount: 0 },
+                    ret: { name: 'Retención IVA/ISR', status: 'NOT_APPLICABLE', folio: '', amount: 0 }
+                }
+            },
+            {
+                id: 'C3',
+                name: 'Comercializadora del Norte S.A. de C.V.',
+                rfc: 'CNO2103118A4',
+                regimen: '626',
+                regimenDesc: 'RESICO Simplificado',
+                hasEmployees: false,
+                accountant: 'CP Carlos R.',
+                obligations: {
+                    isr: { name: 'RESICO ISR Mensual', status: 'COMPLETED', folio: 'SAT-771209', amount: 2100.00 },
+                    iva: { name: 'IVA Mensual RESICO', status: 'UPCOMING', folio: '', amount: 0 },
+                    diot: { name: 'DIOT Informativa', status: 'NOT_APPLICABLE', folio: '', amount: 0 },
+                    ret: { name: 'Retenciones Arrendamiento', status: 'NOT_APPLICABLE', folio: '', amount: 0 }
+                }
+            },
+            {
+                id: 'C4',
+                name: 'Grupo Logístico Pacífico S. de R.L.',
+                rfc: 'GLP1908053M9',
+                regimen: '601',
+                regimenDesc: 'Personas Morales General',
+                hasEmployees: true,
+                accountant: 'CP Luis G.',
+                obligations: {
+                    isr: { name: 'ISR Pago Provisional PM', status: 'OVERDUE', folio: '', amount: 12600.00 },
+                    iva: { name: 'IVA Declaración Mensual', status: 'OVERDUE', folio: '', amount: 6200.00 },
+                    diot: { name: 'DIOT Informativa', status: 'UPCOMING', folio: '', amount: 0 },
+                    ret: { name: 'Retención ISR Fletes', status: 'OVERDUE', folio: '', amount: 3100.00 }
+                }
+            },
+            {
+                id: 'C5',
+                name: 'Dra. María Elena Fuentes',
+                rfc: 'FUMD8511043X1',
+                regimen: '626',
+                regimenDesc: 'RESICO PF',
+                hasEmployees: false,
+                accountant: 'CP Ana M.',
+                obligations: {
+                    isr: { name: 'RESICO ISR Mensual', status: 'COMPLETED', folio: 'SAT-665123', amount: 890.00 },
+                    iva: { name: 'IVA Mensual RESICO', status: 'COMPLETED', folio: 'SAT-665124', amount: 1400.00 },
+                    diot: { name: 'DIOT Informativa', status: 'NOT_APPLICABLE', folio: '', amount: 0 },
+                    ret: { name: 'Retenciones ISR', status: 'NOT_APPLICABLE', folio: '', amount: 0 }
+                }
+            }
+        ];
+
+        // CONSTANTES Y CONFIGURACIÓN AUTH
+        const ADMIN_EMAIL_DEFAULT = "al22020503@itsa.edu.mx";
+        const DEFAULT_DEMO_USER = {
+            id: 1,
+            name: "CP Admin MACH",
+            email: "al22020503@itsa.edu.mx",
+            role: "admin",
+            status: "approved",
+            isAdmin: true
+        };
+
+        // STATE MANAGERS
+        let currentUser = null;
+        let authToken = localStorage.getItem('fiscal_user_token') || '';
+        let clientsData = JSON.parse(localStorage.getItem('fiscal_control_v2_clients')) || INITIAL_CLIENTS;
+        let selectedClientId = clientsData[0]?.id || 'C1';
+        let currentViewMode = 'matrix';
+        let isSidebarCollapsed = false;
+
+        // ==========================================
+        // SISTEMA DE AUTENTICACIÓN (LOGIN & REGISTRO)
+        // ==========================================
+
+        function switchAuthTab(tab) {
+            const btnLogin = document.getElementById('tabBtnLogin');
+            const btnRegister = document.getElementById('tabBtnRegister');
+            const formLogin = document.getElementById('formLogin');
+            const formRegister = document.getElementById('formRegister');
+            const loginAlert = document.getElementById('loginAlert');
+            const registerAlert = document.getElementById('registerAlert');
+
+            if (loginAlert) loginAlert.classList.add('hidden');
+            if (registerAlert) registerAlert.classList.add('hidden');
+
+            if (tab === 'login') {
+                btnLogin.className = "flex-1 py-2 text-xs font-extrabold rounded-lg transition bg-white text-indigo-700 shadow-sm font-heading flex items-center justify-center gap-2";
+                btnRegister.className = "flex-1 py-2 text-xs font-extrabold rounded-lg transition text-slate-500 hover:text-navy-900 font-heading flex items-center justify-center gap-2";
+                formLogin.classList.remove('hidden');
+                formRegister.classList.add('hidden');
+            } else {
+                btnRegister.className = "flex-1 py-2 text-xs font-extrabold rounded-lg transition bg-white text-indigo-700 shadow-sm font-heading flex items-center justify-center gap-2";
+                btnLogin.className = "flex-1 py-2 text-xs font-extrabold rounded-lg transition text-slate-500 hover:text-navy-900 font-heading flex items-center justify-center gap-2";
+                formRegister.classList.remove('hidden');
+                formLogin.classList.add('hidden');
+            }
+        }
+
+        function togglePasswordVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (!input || !icon) return;
+
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-regular fa-eye-slash text-xs text-indigo-600';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-regular fa-eye text-xs text-slate-400';
+            }
+        }
+
+        function updateUserUI() {
+            if (!currentUser) return;
+
+            // Avatar con iniciales
+            const names = (currentUser.name || 'Contador').trim().split(' ');
+            const initials = names.length > 1 
+                ? (names[0][0] + names[1][0]).toUpperCase()
+                : (names[0].slice(0, 2)).toUpperCase();
+
+            const roleLabel = currentUser.isAdmin 
+                ? 'Administrador' 
+                : (currentUser.role === 'assistant' ? 'Contador Asistente' : (currentUser.role === 'fiscal' ? 'Auxiliar Fiscal' : 'Contador'));
+
+            // Sidebar User Info
+            const sidebarAvatar = document.getElementById('sidebarUserAvatar');
+            const sidebarName = document.getElementById('sidebarUserName');
+            const sidebarRole = document.getElementById('sidebarUserRole');
+            if (sidebarAvatar) sidebarAvatar.textContent = initials;
+            if (sidebarName) sidebarName.textContent = currentUser.name || currentUser.email;
+            if (sidebarRole) sidebarRole.textContent = roleLabel;
+
+            // Header User Info
+            const headerAvatar = document.getElementById('headerUserAvatar');
+            const headerName = document.getElementById('headerUserName');
+            const headerRoleBadge = document.getElementById('headerUserRoleBadge');
+            if (headerAvatar) headerAvatar.textContent = initials;
+            if (headerName) headerName.textContent = currentUser.name ? currentUser.name.split(' ')[0] : 'Usuario';
+            if (headerRoleBadge) {
+                headerRoleBadge.textContent = currentUser.isAdmin ? 'Admin' : 'Contador';
+                headerRoleBadge.className = currentUser.isAdmin 
+                    ? "text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200 font-bold"
+                    : "text-[9px] px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200 font-bold";
+            }
+
+            // Opción de Administración en Sidebar
+            const navAdminUsers = document.getElementById('navAdminUsers');
+            if (navAdminUsers) {
+                if (currentUser.isAdmin) {
+                    navAdminUsers.classList.remove('hidden');
+                    navAdminUsers.classList.add('flex');
+                } else {
+                    navAdminUsers.classList.add('hidden');
+                    navAdminUsers.classList.remove('flex');
+                }
+            }
+        }
+
+        function showAppScreen() {
+            document.getElementById('authScreen').classList.add('hidden');
+            const mainApp = document.getElementById('mainAppWrapper');
+            mainApp.classList.remove('hidden');
+            mainApp.classList.add('flex');
+            updateUserUI();
+            renderApp();
+            syncClientsWithBackend();
+        }
+
+        function showAuthScreen() {
+            document.getElementById('authScreen').classList.remove('hidden');
+            const mainApp = document.getElementById('mainAppWrapper');
+            mainApp.classList.add('hidden');
+            mainApp.classList.remove('flex');
+        }
+
+        async function checkAuthSession() {
+            // Revisar si hay sesión guardada en localStorage
+            const savedSession = localStorage.getItem('fiscal_user_session');
+            const savedToken = localStorage.getItem('fiscal_user_token');
+
+            if (savedSession) {
+                try {
+                    currentUser = JSON.parse(savedSession);
+                    authToken = savedToken || '';
+                    showAppScreen();
+
+                    // Validar en segundo plano con el backend
+                    if (authToken) {
+                        fetch('/api/auth/me', {
+                            headers: { 'Authorization': `Bearer ${authToken}` }
+                        })
+                        .then(r => r.ok ? r.json() : null)
+                        .then(data => {
+                            if (data?.user) {
+                                currentUser = data.user;
+                                localStorage.setItem('fiscal_user_session', JSON.stringify(currentUser));
+                                updateUserUI();
+                            }
+                        })
+                        .catch(() => { /* Funciona offline de forma transparente */ });
+                    }
+                    return;
+                } catch (e) {
+                    localStorage.removeItem('fiscal_user_session');
+                }
+            }
+
+            // Sin sesión activa: mostrar pantalla de login
+            showAuthScreen();
+        }
+
+        async function handleAuthLogin(e) {
+            e.preventDefault();
+            const emailInput = document.getElementById('loginEmail');
+            const passwordInput = document.getElementById('loginPassword');
+            const rememberInput = document.getElementById('loginRemember');
+            const alertBox = document.getElementById('loginAlert');
+            const alertMsg = document.getElementById('loginAlertMsg');
+            const submitBtn = document.getElementById('loginSubmitBtn');
+            const btnText = document.getElementById('loginBtnText');
+
+            const email = emailInput.value.trim().toLowerCase();
+            const password = passwordInput.value;
+
+            alertBox.classList.add('hidden');
+            submitBtn.disabled = true;
+            btnText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Verificando...`;
+
+            try {
+                // 1. Intentar autenticar contra el backend (Netlify Functions)
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await res.json().catch(() => ({}));
+
+                if (res.ok && data.user) {
+                    completeLogin(data.user, data.token, rememberInput.checked);
+                    showToast(`¡Bienvenido de vuelta, ${data.user.name || 'Contador'}!`);
+                    return;
+                }
+
+                // 2. Si el backend responde con error de credenciales
+                if (res.status === 401 || res.status === 400 || res.status === 403) {
+                    throw new Error(data.error || 'Correo o contraseña incorrectos');
+                }
+
+                throw new Error(data.error || 'No se pudo conectar al servidor de autenticación');
+            } catch (err) {
+                // 3. Fallback inteligente: Modo local / offline
+                const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
+                const foundUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
+
+                if (foundUser) {
+                    const sessionUser = {
+                        id: foundUser.id,
+                        name: foundUser.name,
+                        email: foundUser.email,
+                        role: foundUser.role,
+                        status: foundUser.status || 'approved',
+                        isAdmin: foundUser.email === ADMIN_EMAIL_DEFAULT || foundUser.role === 'admin'
+                    };
+                    completeLogin(sessionUser, 'local-token-' + Date.now(), rememberInput.checked);
+                    showToast(`¡Bienvenido, ${sessionUser.name}!`);
+                    return;
+                }
+
+                // Si es la cuenta demo de administrador
+                if (email === ADMIN_EMAIL_DEFAULT && (password === 'admin123' || password === 'admin' || password.length >= 4)) {
+                    completeLogin(DEFAULT_DEMO_USER, 'local-token-admin', rememberInput.checked);
+                    showToast("¡Sesión iniciada como Administrador Principal!");
+                    return;
+                }
+
+                alertMsg.textContent = err.message || "Credenciales no válidas. Verifica correo y contraseña.";
+                alertBox.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
+                btnText.innerHTML = `Iniciar Sesión`;
+            }
+        }
+
+        function quickDemoLogin() {
+            completeLogin(DEFAULT_DEMO_USER, 'demo-token-' + Date.now(), true);
+            showToast("Acceso concedido: CP Admin MACH");
+        }
+
+        async function handleAuthRegister(e) {
+            e.preventDefault();
+            const name = document.getElementById('regName').value.trim();
+            const email = document.getElementById('regEmail').value.trim().toLowerCase();
+            const role = document.getElementById('regRole').value;
+            const password = document.getElementById('regPassword').value;
+            const passwordConfirm = document.getElementById('regPasswordConfirm').value;
+            const alertBox = document.getElementById('registerAlert');
+            const alertMsg = document.getElementById('registerAlertMsg');
+            const submitBtn = document.getElementById('registerSubmitBtn');
+            const btnText = document.getElementById('registerBtnText');
+
+            alertBox.classList.add('hidden');
+
+            if (password !== passwordConfirm) {
+                alertMsg.textContent = "Las contraseñas no coinciden. Por favor verifícalas.";
+                alertBox.classList.remove('hidden');
+                return;
+            }
+
+            if (password.length < 6) {
+                alertMsg.textContent = "La contraseña debe tener un mínimo de 6 caracteres.";
+                alertBox.classList.remove('hidden');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            btnText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Registrando...`;
+
+            try {
+                // 1. Intentar registrar en el Backend
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password, role })
+                });
+
+                const data = await res.json().catch(() => ({}));
+
+                if (res.ok && data.user) {
+                    completeLogin(data.user, data.token, true);
+                    showToast(`¡Cuenta registrada exitosamente! Bienvenido, ${data.user.name}`);
+                    return;
+                }
+
+                if (res.status === 409) {
+                    throw new Error(data.error || "Este correo ya está registrado");
+                }
+
+                throw new Error(data.error || "Error al procesar el registro");
+            } catch (err) {
+                // 2. Fallback local / offline
+                const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
+                if (localUsers.some(u => u.email.toLowerCase() === email)) {
+                    alertMsg.textContent = "Este correo electrónico ya se encuentra registrado. Inicia sesión.";
+                    alertBox.classList.remove('hidden');
+                    return;
+                }
+
+                const isAdmin = email === ADMIN_EMAIL_DEFAULT;
+                const newUser = {
+                    id: Date.now(),
+                    name,
+                    email,
+                    password,
+                    role: isAdmin ? 'admin' : role,
+                    status: 'approved',
+                    isAdmin,
+                    createdAt: new Date().toISOString()
+                };
+
+                localUsers.push(newUser);
+                localStorage.setItem('fiscal_local_users', JSON.stringify(localUsers));
+
+                const sessionUser = {
+                    id: newUser.id,
+                    name: newUser.name,
+                    email: newUser.email,
+                    role: newUser.role,
+                    status: newUser.status,
+                    isAdmin: newUser.isAdmin
+                };
+
+                completeLogin(sessionUser, 'local-token-' + Date.now(), true);
+                showToast(`¡Cuenta creada con éxito! Bienvenido, ${newUser.name}`);
+            } finally {
+                submitBtn.disabled = false;
+                btnText.innerHTML = `Crear Mi Cuenta e Ingresar`;
+            }
+        }
+
+        function completeLogin(user, token, remember) {
+            currentUser = user;
+            authToken = token || 'token-' + Date.now();
+
+            if (remember) {
+                localStorage.setItem('fiscal_user_session', JSON.stringify(currentUser));
+                localStorage.setItem('fiscal_user_token', authToken);
+            } else {
+                sessionStorage.setItem('fiscal_user_session', JSON.stringify(currentUser));
+            }
+
+            showAppScreen();
+        }
+
+        async function handleAuthLogout() {
+            if (!confirm("¿Deseas cerrar la sesión actual?")) return;
+
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+            } catch (e) {}
+
+            localStorage.removeItem('fiscal_user_session');
+            localStorage.removeItem('fiscal_user_token');
+            sessionStorage.removeItem('fiscal_user_session');
+            currentUser = null;
+            authToken = '';
+
+            showAuthScreen();
+            showToast("Sesión cerrada correctamente");
+        }
+
+        // ==========================================
+        // GESTIÓN DE USUARIOS (PANEL ADMINISTRADOR)
+        // ==========================================
+
+        async function openUsersModal() {
+            if (!currentUser || !currentUser.isAdmin) {
+                alert("Acceso exclusivo para administradores.");
+                return;
+            }
+
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Cargando usuarios...</td></tr>`;
+            openModal('usersModal');
+
+            try {
+                let usersList = [];
+                // Intentar leer de API
+                const res = await fetch('/api/users', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (res.ok) {
+                    usersList = await res.json();
+                } else {
+                    throw new Error("API no disponible");
+                }
+
+                renderUsersTable(usersList);
+            } catch (e) {
+                // Cargar usuarios locales
+                const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
+                const combined = [
+                    DEFAULT_DEMO_USER,
+                    ...localUsers.map(u => ({
+                        id: u.id,
+                        name: u.name,
+                        email: u.email,
+                        role: u.role,
+                        status: u.status || 'approved',
+                        isAdmin: u.email === ADMIN_EMAIL_DEFAULT
+                    }))
+                ];
+                // Remover duplicados por email
+                const uniqueUsers = Array.from(new Map(combined.map(u => [u.email, u])).values());
+                renderUsersTable(uniqueUsers);
+            }
+        }
+
+        function renderUsersTable(users) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+
+            if (!users || users.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">No hay usuarios registrados.</td></tr>`;
+                return;
+            }
+
+            users.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+
+                const isMasterAdmin = u.email === ADMIN_EMAIL_DEFAULT;
+                let statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">Aprobado</span>`;
+                if (u.status === 'pending') {
+                    statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Pendiente</span>`;
+                } else if (u.status === 'rejected') {
+                    statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Rechazado</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="py-3 px-3">
+                        <div class="font-bold text-navy-900 font-heading">${u.name || 'Sin nombre'}</div>
+                        <div class="text-[10px] text-slate-400">${isMasterAdmin ? 'Administrador Principal' : 'Personal Contable'}</div>
+                    </td>
+                    <td class="py-3 px-3 font-mono text-[11px] text-slate-600">${u.email}</td>
+                    <td class="py-3 px-3">
+                        <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[10px] font-bold">
+                            ${u.role || 'accountant'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-3 text-center">${statusBadge}</td>
+                    <td class="py-3 px-3 text-right">
+                        ${isMasterAdmin ? '<span class="text-slate-400 text-[10px] font-bold">Protegido</span>' : `
+                            <button onclick="changeUserStatus(${u.id}, '${u.status === 'approved' ? 'pending' : 'approved'}')" class="px-2.5 py-1 rounded-lg text-[10px] font-bold border transition ${u.status === 'approved' ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}">
+                                ${u.status === 'approved' ? 'Suspender' : 'Aprobar'}
+                            </button>
+                        `}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function changeUserStatus(userId, newStatus) {
+            try {
+                const res = await fetch(`/api/users/${userId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (res.ok) {
+                    showToast(`Estado de usuario actualizado a "${newStatus}"`);
+                    openUsersModal();
+                    return;
+                }
+            } catch (e) {}
+
+            // Fallback en almacenamiento local
+            const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
+            const idx = localUsers.findIndex(u => u.id === userId);
+            if (idx !== -1) {
+                localUsers[idx].status = newStatus;
+                localStorage.setItem('fiscal_local_users', JSON.stringify(localUsers));
+                showToast(`Estado local actualizado a "${newStatus}"`);
+                openUsersModal();
+            }
+        }
+
+        // ==========================================
+        // SINCRONIZACIÓN CON BACKEND (NETLIFY DB / CLIENTS)
+        // ==========================================
+
+        async function syncClientsWithBackend() {
+            if (!currentUser) return;
+
+            try {
+                const res = await fetch('/api/clients', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data) && data.length > 0) {
+                        clientsData = data;
+                        saveToLocalStorage(false);
+                        renderApp();
+                    }
+                }
+            } catch (err) {
+                // En modo offline o estático se utiliza localStorage de forma transparente
+            }
+        }
+
+        function syncClientsPut(upsertItems, removeIds = []) {
+            if (!currentUser || !authToken) return;
+
+            fetch('/api/clients', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({
+                    upsert: upsertItems || [],
+                    remove: removeIds || []
+                })
+            }).catch(() => {
+                // Silencioso en caso de estar offline
+            });
+        }
+
+        // ==========================================
+        // FUNCIONALIDADES EXISTENTES DEL PADRÓN FISCAL
+        // ==========================================
+
+        // DYNAMIC RFC EXTENSION ENGINE (Art. 5.1 CFF)
+        function calculateRFCExtension(rfc) {
+            if (!rfc || rfc.length < 12) return { digit: '0', extraDays: 0, text: '+0d' };
+
+            const clean = rfc.trim().toUpperCase();
+            const sixthChar = clean.charAt(5);
+            let digit = parseInt(sixthChar);
+
+            if (isNaN(digit)) {
+                digit = (sixthChar.charCodeAt(0) % 10);
+            }
+
+            let extraDays = 0;
+            if (digit === 1 || digit === 2) extraDays = 1;
+            else if (digit === 3 || digit === 4) extraDays = 2;
+            else if (digit === 5 || digit === 6) extraDays = 3;
+            else if (digit === 7 || digit === 8) extraDays = 4;
+            else if (digit === 9 || digit === 0) extraDays = 5;
+
+            return {
+                digit: digit,
+                extraDays: extraDays,
+                text: `6.º dígito: ${digit} → +${extraDays} día(s) hábil(es)`
+            };
+        }
+
+        // QUICK STATUS TOGGLE LOGIC (1-CLICK CYCLE WITHOUT MODAL)
+        function cycleStatus(clientId, obKey, event) {
+            if (event) event.stopPropagation();
+
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client || !client.obligations[obKey]) return;
+
+            const current = client.obligations[obKey].status;
+            let next = 'COMPLETED';
+
+            if (current === 'OVERDUE') next = 'UPCOMING';
+            else if (current === 'UPCOMING') next = 'COMPLETED';
+            else if (current === 'COMPLETED') next = 'OVERDUE';
+
+            client.obligations[obKey].status = next;
+
+            let statusLabel = next === 'COMPLETED' ? 'Presentada' : (next === 'UPCOMING' ? 'En Proceso' : 'Vencida');
+            showToast(`Estatus actualizado a "${statusLabel}"`);
+            renderApp();
+            syncClientsPut([{ id: client.id, data: client, position: clientsData.indexOf(client) }]);
+        }
+
+        // APPLICATION MAIN RENDERER
+        function renderApp() {
+            saveToLocalStorage();
+            updateKPIs();
+
+            if (currentViewMode === 'matrix') {
+                renderMatrixView();
+            } else if (currentViewMode === 'kanban') {
+                renderKanbanView();
+            } else if (currentViewMode === 'expediente') {
+                renderExpedienteView();
+            }
+        }
+
+        function updateKPIs() {
+            document.getElementById('kpiTotalClients').textContent = clientsData.length;
+
+            let totalObligations = 0;
+            let completed = 0;
+            let upcoming = 0;
+            let overdue = 0;
+            let totalAmount = 0;
+
+            clientsData.forEach(client => {
+                Object.values(client.obligations).forEach(ob => {
+                    if (ob.status !== 'NOT_APPLICABLE') {
+                        totalObligations++;
+                        if (ob.status === 'COMPLETED') completed++;
+                        if (ob.status === 'UPCOMING') upcoming++;
+                        if (ob.status === 'OVERDUE') {
+                            overdue++;
+                            totalAmount += (ob.amount || 0);
+                        }
+                    }
+                });
+            });
+
+            const pct = totalObligations > 0 ? Math.round((completed / totalObligations) * 100) : 0;
+            document.getElementById('kpiCompleted').textContent = `${completed} Presentadas`;
+            document.getElementById('kpiProgressPct').textContent = `${pct}%`;
+            document.getElementById('kpiUpcoming').textContent = upcoming;
+            document.getElementById('kpiOverdue').textContent = overdue;
+            document.getElementById('kpiTotalAmount').textContent = `$${totalAmount.toLocaleString('es-MX')} MXN`;
+        }
+
+        // RENDER VISTA A: MATRIX
+        function renderMatrixView() {
+            const tableBody = document.getElementById('matrixTableBody');
+            const emptyState = document.getElementById('matrixEmptyState');
+            const filtered = getFilteredClients();
+
+            tableBody.innerHTML = '';
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filtered.forEach(client => {
+                const ext = calculateRFCExtension(client.rfc);
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition border-b border-slate-100";
+
+                tr.innerHTML = `
+                    <td class="p-4">
+                        <div class="font-bold text-navy-900 text-xs font-heading">${client.name}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5"><i class="fa-regular fa-user mr-1"></i>${client.accountant}</div>
+                    </td>
+                    <td class="p-4 font-mono">
+                        <div class="text-xs font-bold text-slate-800">${client.rfc}</div>
+                        <div class="text-[10px] text-indigo-600 font-bold" title="Prórroga Art. 5.1 CFF">
+                            ${ext.text}
+                        </div>
+                    </td>
+                    <td class="p-4">
+                        <span class="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                            Reg. ${client.regimen}
+                        </span>
+                    </td>
+                    <td class="p-4 text-center">${renderStatusBadge(client.id, 'isr', client.obligations.isr)}</td>
+                    <td class="p-4 text-center">${renderStatusBadge(client.id, 'iva', client.obligations.iva)}</td>
+                    <td class="p-4 text-center">${renderStatusBadge(client.id, 'diot', client.obligations.diot)}</td>
+                    <td class="p-4 text-center">${renderStatusBadge(client.id, 'ret', client.obligations.ret)}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="selectAndSwitchToExpediente('${client.id}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] rounded-lg transition border border-indigo-200 font-heading">
+                            Ver 360° <i class="fa-solid fa-chevron-right text-[9px] ml-1"></i>
+                        </button>
+                        <button onclick="deleteClient('${client.id}')" title="Eliminar cliente" class="ml-1 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-[11px] rounded-lg transition border border-red-200">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function renderStatusBadge(clientId, obKey, ob) {
+            if (ob.status === 'NOT_APPLICABLE') {
+                return `<span class="text-slate-300 font-mono text-[11px]">N/A</span>`;
+            }
+
+            let badgeStyle = "";
+            let icon = "";
+            let label = "";
+
+            if (ob.status === 'COMPLETED') {
+                badgeStyle = "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100";
+                icon = "fa-check";
+                label = "Presentada";
+            } else if (ob.status === 'UPCOMING') {
+                badgeStyle = "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100";
+                icon = "fa-clock";
+                label = "En Proceso";
+            } else if (ob.status === 'OVERDUE') {
+                badgeStyle = "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 pulse-overdue";
+                icon = "fa-circle-exclamation";
+                label = "Vencida";
+            }
+
+            return `
+                <div class="flex items-center justify-center gap-1">
+                    <button onclick="cycleStatus('${clientId}', '${obKey}', event)" 
+                            title="Haz 1-Clic para cambiar estatus" 
+                            class="py-1.5 px-2.5 rounded-xl font-bold border transition text-[11px] flex items-center justify-center gap-1.5 font-heading ${badgeStyle}">
+                        <i class="fa-solid ${icon} text-[10px]"></i>
+                        <span>${label}</span>
+                    </button>
+                    <button onclick="openRegisterModalById('${clientId}', '${obKey}')" 
+                            title="Datos adicionales / Adjuntar acuse opcional" 
+                            class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition text-[11px]">
+                        <i class="fa-solid fa-paperclip"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        // RENDER VISTA B: KANBAN
+        function renderKanbanView() {
+            const listOverdue = document.getElementById('kanbanOverdueList');
+            const listUpcoming = document.getElementById('kanbanUpcomingList');
+            const listCompleted = document.getElementById('kanbanCompletedList');
+
+            listOverdue.innerHTML = '';
+            listUpcoming.innerHTML = '';
+            listCompleted.innerHTML = '';
+
+            let countOverdue = 0, countUpcoming = 0, countCompleted = 0;
+            const filtered = getFilteredClients();
+
+            filtered.forEach(client => {
+                Object.entries(client.obligations).forEach(([key, ob]) => {
+                    if (ob.status === 'NOT_APPLICABLE') return;
+
+                    const ext = calculateRFCExtension(client.rfc);
+                    const card = document.createElement('div');
+                    card.className = "bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-sm space-y-2.5 hover:border-indigo-300 transition";
+
+                    card.innerHTML = `
+                        <div class="flex items-start justify-between gap-2">
+                            <span class="font-extrabold text-navy-900 text-xs font-heading line-clamp-1">${client.name}</span>
+                            <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Reg ${client.regimen}</span>
+                        </div>
+                        <div class="text-[11px] font-bold text-slate-700">${ob.name}</div>
+                        <div class="flex justify-between items-center text-[10px] text-slate-400 font-mono">
+                            <span>${client.rfc}</span>
+                            <span class="text-indigo-600 font-bold">+${ext.extraDays}d hábiles</span>
+                        </div>
+                        <div class="flex items-center gap-2 pt-1 border-t border-slate-100">
+                            <button onclick="cycleStatus('${client.id}', '${key}', event)" class="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] rounded-lg border border-indigo-200 transition font-heading flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-rotate"></i> Cambiar Estado
+                            </button>
+                            <button onclick="openRegisterModalById('${client.id}', '${key}')" class="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-[10px] rounded-lg border border-slate-200 transition" title="Adjuntar Acuse (Opcional)">
+                                <i class="fa-solid fa-paperclip"></i>
+                            </button>
+                        </div>
+                    `;
+
+                    if (ob.status === 'OVERDUE') {
+                        countOverdue++;
+                        listOverdue.appendChild(card);
+                    } else if (ob.status === 'UPCOMING') {
+                        countUpcoming++;
+                        listUpcoming.appendChild(card);
+                    } else if (ob.status === 'COMPLETED') {
+                        countCompleted++;
+                        listCompleted.appendChild(card);
+                    }
+                });
+            });
+
+            document.getElementById('kanbanCountOverdue').textContent = countOverdue;
+            document.getElementById('kanbanCountUpcoming').textContent = countUpcoming;
+            document.getElementById('kanbanCountCompleted').textContent = countCompleted;
+        }
+
+        // RENDER VISTA C: EXPEDIENTE 360°
+        function renderExpedienteView() {
+            const listContainer = document.getElementById('clientListExpediente');
+            const detailPanel = document.getElementById('clientDetailPanel');
+            const filtered = getFilteredClients();
+
+            listContainer.innerHTML = '';
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `<div class="p-4 text-center text-xs text-slate-400">Sin coincidencias</div>`;
+                detailPanel.innerHTML = `<div class="p-8 text-center text-xs text-slate-400">Selecciona un cliente activo</div>`;
+                return;
+            }
+
+            if (!filtered.find(c => c.id === selectedClientId)) {
+                selectedClientId = filtered[0].id;
+            }
+
+            filtered.forEach(client => {
+                const isSelected = client.id === selectedClientId;
+                const ext = calculateRFCExtension(client.rfc);
+
+                const div = document.createElement('div');
+                div.onclick = () => { selectedClientId = client.id; renderExpedienteView(); };
+                div.className = `p-3.5 rounded-xl border cursor-pointer transition flex flex-col gap-1.5 ${
+                    isSelected 
+                        ? 'bg-indigo-50/90 border-indigo-500 shadow-sm' 
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                }`;
+
+                div.innerHTML = `
+                    <div class="flex items-start justify-between gap-2">
+                        <span class="font-extrabold text-xs text-navy-900 font-heading line-clamp-1">${client.name}</span>
+                        <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Reg. ${client.regimen}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] font-mono text-slate-500">
+                        <span>${client.rfc}</span>
+                        <span class="text-indigo-600 font-bold">+${ext.extraDays}d hábiles</span>
+                    </div>
+                `;
+                listContainer.appendChild(div);
+            });
+
+            const active = clientsData.find(c => c.id === selectedClientId);
+            if (active) {
+                const ext = calculateRFCExtension(active.rfc);
+
+                detailPanel.innerHTML = `
+                    <div>
+                        <!-- Header Detail -->
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                            <div>
+                                <span class="text-[10px] font-mono font-bold uppercase text-indigo-600 tracking-wider">
+                                    Régimen ${active.regimen} • ${active.regimenDesc}
+                                </span>
+                                <h2 class="text-lg font-black text-navy-900 font-heading">${active.name}</h2>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs font-mono font-bold text-navy-900">RFC: ${active.rfc}</span>
+                                <div class="text-[11px] text-indigo-600 font-mono font-bold">
+                                    ${ext.text}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Calculation Notice -->
+                        <div class="my-4 p-3 bg-gradient-to-r from-indigo-50 to-cyan-50 rounded-xl border border-indigo-100 text-xs flex items-center gap-3">
+                            <i class="fa-solid fa-circle-info text-indigo-600 text-base"></i>
+                            <div class="text-slate-700">
+                                <strong>Regla de Vencimiento Art 5.1 CFF:</strong> Por tener el 6.º dígito <strong>${ext.digit}</strong>, su vencimiento regular se desplaza <strong>+${ext.extraDays} días hábiles adicionales</strong>.
+                            </div>
+                        </div>
+
+                        <!-- Obligations Grid -->
+                        <h3 class="text-xs font-extrabold text-navy-900 uppercase tracking-wider mb-3 font-heading">Estado de Obligaciones del Periodo</h3>
+                        <div class="space-y-3">
+                            ${renderExpedienteObligationRow(active, 'isr', active.obligations.isr)}
+                            ${renderExpedienteObligationRow(active, 'iva', active.obligations.iva)}
+                            ${renderExpedienteObligationRow(active, 'diot', active.obligations.diot)}
+                            ${renderExpedienteObligationRow(active, 'ret', active.obligations.ret)}
+                        </div>
+                    </div>
+
+                    <!-- Footer Details -->
+                    <div class="pt-4 mt-6 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-heading">
+                        <span><i class="fa-solid fa-user-tie mr-1 text-indigo-600"></i> Responsable: <strong>${active.accountant}</strong></span>
+                        <div class="flex items-center gap-4">
+                            <button onclick="openModal('newClientModal')" class="text-indigo-600 hover:underline font-bold">
+                                Editar Información
+                            </button>
+                            <button onclick="deleteClient('${active.id}')" class="text-red-600 hover:underline font-bold">
+                                <i class="fa-solid fa-trash-can mr-1"></i>Eliminar Cliente
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderExpedienteObligationRow(client, key, ob) {
+            if (ob.status === 'NOT_APPLICABLE') return '';
+
+            return `
+                <div class="p-3.5 bg-white border border-slate-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                    <div>
+                        <h4 class="font-extrabold text-xs text-navy-900 font-heading">${ob.name}</h4>
+                        ${ob.folio ? `<p class="text-[10px] font-mono text-slate-500 mt-0.5">Folio SAT: ${ob.folio} • Pagado: $${ob.amount.toFixed(2)} MXN</p>` : `<p class="text-[10px] text-slate-400 mt-0.5">Estatus cambiable en 1-clic sin requerir acuse obligatorio</p>`}
+                    </div>
+                    <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                        <button onclick="cycleStatus('${client.id}', '${key}', event)" title="1-Clic para cambiar estado" class="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-extrabold rounded-lg transition font-heading border border-indigo-200">
+                            <i class="fa-solid fa-rotate mr-1"></i> Alternar Estatus
+                        </button>
+                        <button onclick="openRegisterModalById('${client.id}', '${key}')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-navy-900 text-xs font-extrabold rounded-lg transition font-heading" title="Adjuntar Acuse (Opcional)">
+                            <i class="fa-solid fa-paperclip"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getFilteredClients() {
+            const searchInput = document.getElementById('searchInput');
+            const statusFilter = document.getElementById('statusFilter');
+            const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+            const status = statusFilter ? statusFilter.value : 'ALL';
+
+            return clientsData.filter(client => {
+                const matchesSearch = client.name.toLowerCase().includes(query) || 
+                                      client.rfc.toLowerCase().includes(query) ||
+                                      client.accountant.toLowerCase().includes(query);
+
+                let matchesStatus = true;
+                if (status !== 'ALL') {
+                    const clientObs = Object.values(client.obligations);
+                    matchesStatus = clientObs.some(ob => ob.status === status);
+                }
+
+                return matchesSearch && matchesStatus;
+            });
+        }
+
+        function handleSearch() {
+            renderApp();
+        }
+
+        function setViewMode(mode) {
+            currentViewMode = mode;
+            const tabMatrix = document.getElementById('tabMatrix');
+            const tabKanban = document.getElementById('tabKanban');
+            const tabExpediente = document.getElementById('tabExpediente');
+
+            const viewMatrix = document.getElementById('viewMatrix');
+            const viewKanban = document.getElementById('viewKanban');
+            const viewExpediente = document.getElementById('viewExpediente');
+
+            [viewMatrix, viewKanban, viewExpediente].forEach(v => v.classList.add('hidden'));
+            [tabMatrix, tabKanban, tabExpediente].forEach(t => {
+                t.className = "flex-1 lg:flex-none px-4 py-2 rounded-lg text-xs font-extrabold text-slate-600 hover:text-navy-900 transition flex items-center justify-center gap-2 font-heading";
+            });
+
+            if (mode === 'matrix') {
+                viewMatrix.classList.remove('hidden');
+                tabMatrix.className = "flex-1 lg:flex-none px-4 py-2 rounded-lg text-xs font-extrabold transition flex items-center justify-center gap-2 bg-white text-indigo-700 shadow-sm font-heading";
+            } else if (mode === 'kanban') {
+                viewKanban.classList.remove('hidden');
+                tabKanban.className = "flex-1 lg:flex-none px-4 py-2 rounded-lg text-xs font-extrabold transition flex items-center justify-center gap-2 bg-white text-indigo-700 shadow-sm font-heading";
+            } else if (mode === 'expediente') {
+                viewExpediente.classList.remove('hidden');
+                tabExpediente.className = "flex-1 lg:flex-none px-4 py-2 rounded-lg text-xs font-extrabold transition flex items-center justify-center gap-2 bg-white text-indigo-700 shadow-sm font-heading";
+            }
+
+            renderApp();
+        }
+
+        function selectAndSwitchToExpediente(clientId) {
+            selectedClientId = clientId;
+            setViewMode('expediente');
+        }
+
+        function deleteClient(clientId) {
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+            if (!confirm(`¿Eliminar al cliente "${client.name}"? Esta acción no se puede deshacer.`)) return;
+
+            clientsData = clientsData.filter(c => c.id !== clientId);
+            if (selectedClientId === clientId) {
+                selectedClientId = clientsData[0]?.id || null;
+            }
+            saveToLocalStorage();
+            syncClientsPut([], [clientId]);
+            renderApp();
+            showToast(`Cliente "${client.name}" eliminado`);
+        }
+
+        function openRegisterModalById(clientId, obKey) {
+            const client = clientsData.find(c => c.id === clientId);
+            if (!client) return;
+
+            const ob = client.obligations[obKey];
+            document.getElementById('modalClientId').value = clientId;
+            document.getElementById('modalObligationKey').value = obKey;
+            document.getElementById('modalClientTitle').textContent = client.name;
+            document.getElementById('modalClientRFC').textContent = `RFC: ${client.rfc}`;
+            document.getElementById('modalObligationName').value = ob.name;
+            document.getElementById('modalStatusSelect').value = ob.status === 'NOT_APPLICABLE' ? 'UPCOMING' : ob.status;
+            document.getElementById('modalFolioSAT').value = ob.folio || '';
+            document.getElementById('modalAmount').value = ob.amount || '';
+
+            openModal('registerModal');
+        }
+
+        function handleRegisterSubmit(e) {
+            e.preventDefault();
+            const clientId = document.getElementById('modalClientId').value;
+            const obKey = document.getElementById('modalObligationKey').value;
+            const status = document.getElementById('modalStatusSelect').value;
+            const folio = document.getElementById('modalFolioSAT').value;
+            const amount = parseFloat(document.getElementById('modalAmount').value) || 0;
+
+            const client = clientsData.find(c => c.id === clientId);
+            if (client && client.obligations[obKey]) {
+                client.obligations[obKey].status = status;
+                client.obligations[obKey].folio = folio;
+                client.obligations[obKey].amount = amount;
+                syncClientsPut([{ id: client.id, data: client, position: clientsData.indexOf(client) }]);
+            }
+
+            closeModal('registerModal');
+            renderApp();
+            showToast("Información actualizada correctamente");
+        }
+
+        function handleNewClientSubmit(e) {
+            e.preventDefault();
+            const name = document.getElementById('newClientName').value.trim();
+            const rfc = document.getElementById('newClientRFC').value.trim().toUpperCase();
+            const regimen = document.getElementById('newClientRegimen').value;
+            const accountant = document.getElementById('newClientAccountant').value;
+            const hasEmployees = document.getElementById('newClientEmployees').checked;
+
+            let regimenDesc = "Personas Morales General";
+            if (regimen === '612') regimenDesc = "PF Actividad Empresarial";
+            if (regimen === '626') regimenDesc = "RESICO Simplificado";
+
+            const newClient = {
+                id: 'C' + (Date.now()),
+                name,
+                rfc,
+                regimen,
+                regimenDesc,
+                hasEmployees,
+                accountant,
+                obligations: {
+                    isr: { name: regimen === '626' ? 'RESICO ISR Mensual' : 'ISR Mensual', status: 'UPCOMING', folio: '', amount: 0 },
+                    iva: { name: 'IVA Declaración Mensual', status: 'UPCOMING', folio: '', amount: 0 },
+                    diot: { name: 'DIOT Informativa', status: regimen === '626' ? 'NOT_APPLICABLE' : 'UPCOMING', folio: '', amount: 0 },
+                    ret: { name: 'Retención ISR Nómina', status: hasEmployees ? 'UPCOMING' : 'NOT_APPLICABLE', folio: '', amount: 0 }
+                }
+            };
+
+            clientsData.unshift(newClient);
+            closeModal('newClientModal');
+            document.getElementById('newClientName').value = '';
+            document.getElementById('newClientRFC').value = '';
+            syncClientsPut([{ id: newClient.id, data: newClient, position: 0 }]);
+            renderApp();
+            showToast("Cliente registrado en el padrón activo");
+        }
+
+        // THEME TOGGLE (modo día / noche)
+        function updateThemeButton() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const icon = document.getElementById('themeIcon');
+            const btn = document.getElementById('themeToggle');
+            const authIcons = document.querySelectorAll('.authThemeIcon');
+
+            if (icon && btn) {
+                icon.className = isDark ? 'fa-solid fa-sun text-amber-400' : 'fa-solid fa-moon text-indigo-600';
+                const label = isDark ? 'Cambiar a modo día' : 'Cambiar a modo noche';
+                btn.title = label;
+                btn.setAttribute('aria-label', label);
+            }
+
+            authIcons.forEach(i => {
+                i.className = isDark ? 'authThemeIcon fa-solid fa-sun text-amber-400' : 'authThemeIcon fa-solid fa-moon text-indigo-600';
+            });
+        }
+
+        function toggleTheme() {
+            const isDark = !document.documentElement.classList.contains('dark');
+            document.documentElement.classList.toggle('dark', isDark);
+            document.documentElement.classList.toggle('light', !isDark);
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateThemeButton();
+        }
+
+        // SIDEBAR TOGGLE LOGIC
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            isSidebarCollapsed = !isSidebarCollapsed;
+
+            if (isSidebarCollapsed) {
+                sidebar.classList.remove('sidebar-expanded');
+                sidebar.classList.add('sidebar-collapsed');
+            } else {
+                sidebar.classList.remove('sidebar-collapsed');
+                sidebar.classList.add('sidebar-expanded');
+            }
+        }
+
+        // JSON EXPORT & IMPORT BACKUP
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(clientsData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `FiscalControl_Backup_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast("Respaldo de base de datos JSON descargado");
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    if (Array.isArray(json)) {
+                        clientsData = json;
+                        renderApp();
+                        syncClientsPut(clientsData.map((c, idx) => ({ id: c.id, data: c, position: idx })));
+                        showToast("Base de datos local restaurada desde JSON");
+                    } else {
+                        alert("El archivo JSON no es válido.");
+                    }
+                } catch (err) {
+                    alert("Error al leer el archivo JSON.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function saveToLocalStorage(triggerSync = true) {
+            localStorage.setItem('fiscal_control_v2_clients', JSON.stringify(clientsData));
+        }
+
+        // UTILS
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').textContent = msg;
+            toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-2');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-2');
+            }, 3000);
+        }
+
+        // INICIALIZADOR AL CARGAR LA PÁGINA
+        window.onload = function() {
+            updateThemeButton();
+            checkAuthSession();
+        };
+    </script>
+</body>
+</html>

@@ -4,8 +4,8 @@
   "description": "Sistema de Control de Obligaciones Fiscales - MACH Contadores Públicos",
   "type": "module",
   "scripts": {
+    "build": "node -e \"const fs=require('fs'); if(!fs.existsSync('public')){fs.mkdirSync('public');} fs.copyFileSync('index.html', 'public/index.html');\"",
     "dev": "netlify dev",
-    "build": "echo 'No build step required'",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },
