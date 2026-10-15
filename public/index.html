@@ -257,6 +257,11 @@
 
             <!-- FORMULARIO: INICIAR SESIÓN -->
             <form id="formLogin" onsubmit="handleAuthLogin(event)" class="space-y-4">
+                <div id="loginInfo" class="hidden p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium flex items-start gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-sm text-amber-600 mt-0.5 shrink-0"></i>
+                    <span id="loginInfoMsg">Tu solicitud de registro ha sido enviada. Requiere autorización del Administrador.</span>
+                </div>
+
                 <div id="loginAlert" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-medium flex items-center gap-2">
                     <i class="fa-solid fa-circle-exclamation text-sm shrink-0"></i>
                     <span id="loginAlertMsg">Error al iniciar sesión</span>
@@ -273,7 +278,6 @@
                 <div>
                     <div class="flex items-center justify-between mb-1">
                         <label class="block text-slate-700 font-bold text-xs font-heading">Contraseña</label>
-                        <a href="javascript:void(0)" onclick="quickDemoLogin()" class="text-[11px] font-bold text-indigo-600 hover:underline">¿Usar cuenta demo?</a>
                     </div>
                     <div class="relative">
                         <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
@@ -294,11 +298,6 @@
                 <button type="submit" id="loginSubmitBtn" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-extrabold text-xs rounded-xl transition shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 font-heading">
                     <span id="loginBtnText">Iniciar Sesión</span>
                     <i class="fa-solid fa-arrow-right text-xs"></i>
-                </button>
-
-                <!-- Acceso Rápido Administrador Demo -->
-                <button type="button" onclick="quickDemoLogin()" class="w-full py-2.5 px-4 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/60 hover:bg-indigo-100/60 text-indigo-700 text-xs font-bold transition flex items-center justify-center gap-2 font-heading">
-                    <i class="fa-solid fa-bolt text-amber-500"></i> Acceso Rápido Administrador Demo
                 </button>
             </form>
 
@@ -364,9 +363,14 @@
                     </div>
                 </div>
 
+                <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 text-[11px] flex items-center gap-2">
+                    <i class="fa-solid fa-user-shield text-indigo-600 shrink-0"></i>
+                    <span>Por seguridad, toda cuenta nueva debe ser autorizada por el Administrador antes del acceso.</span>
+                </div>
+
                 <button type="submit" id="registerSubmitBtn" class="w-full py-3 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-700 hover:to-indigo-700 text-white font-extrabold text-xs rounded-xl transition shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 font-heading">
-                    <span id="registerBtnText">Crear Mi Cuenta e Ingresar</span>
-                    <i class="fa-solid fa-user-check text-xs"></i>
+                    <span id="registerBtnText">Enviar Solicitud de Registro</span>
+                    <i class="fa-solid fa-paper-plane text-xs"></i>
                 </button>
 
                 <p class="text-center text-[11px] text-slate-500 pt-1">
@@ -860,33 +864,53 @@
         </div>
     </div>
 
-    <!-- MODAL 4: GESTIÓN DE USUARIOS (ADMINISTRADOR) -->
+    <!-- MODAL 4: GESTIÓN DE USUARIOS Y AUTORIZACIONES (ADMINISTRADOR) -->
     <div id="usersModal" class="fixed inset-0 bg-navy-950/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-2xl rounded-2xl p-6 border border-slate-200 shadow-2xl space-y-4">
+        <div class="bg-white w-full max-w-3xl rounded-2xl p-6 border border-slate-200 shadow-2xl space-y-4">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">
-                        <i class="fa-solid fa-users-gear"></i>
+                    <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-base font-bold shadow-sm">
+                        <i class="fa-solid fa-user-shield"></i>
                     </div>
                     <div>
-                        <h3 class="text-base font-extrabold text-navy-900 font-heading">Gestión de Usuarios y Accesos</h3>
-                        <p class="text-xs text-slate-500">Administración de cuentas con acceso al padrón fiscal</p>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base font-extrabold text-navy-900 font-heading">Panel de Aprobación de Usuarios</h3>
+                            <span id="usersPendingBadge" class="hidden text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                0 pendientes
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500">Panel exclusivo: <strong class="text-indigo-600">al22020503@itsa.edu.mx</strong>. Autoriza o rechaza solicitudes de acceso.</p>
                     </div>
                 </div>
-                <button onclick="closeModal('usersModal')" class="text-slate-400 hover:text-navy-900 transition">
-                    <i class="fa-solid fa-xmark text-lg"></i>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="openUsersModal()" title="Actualizar lista" class="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition">
+                        <i class="fa-solid fa-arrows-rotate text-sm"></i>
+                    </button>
+                    <button type="button" onclick="closeModal('usersModal')" class="p-2 rounded-xl text-slate-400 hover:text-navy-900 hover:bg-slate-100 transition">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-3 bg-indigo-50/70 border border-indigo-100/80 rounded-xl text-xs text-indigo-900 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-lock text-indigo-600 text-sm shrink-0"></i>
+                    <span>Toda persona que se registre aparecerá aquí como <strong>Pendiente</strong> y no podrá entrar al sistema hasta que tú la autorices.</span>
+                </div>
+                <button type="button" onclick="resetAllAccountsConfirm()" class="shrink-0 px-2.5 py-1 text-[11px] font-bold text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 rounded-lg transition" title="Elimina todas las cuentas registradas y mantiene únicamente la de Administrador">
+                    <i class="fa-solid fa-trash-can mr-1"></i> Purgar cuentas extras
                 </button>
             </div>
 
-            <div class="overflow-x-auto max-h-[360px]">
+            <div class="overflow-x-auto max-h-[380px] border border-slate-100 rounded-xl">
                 <table class="w-full text-left text-xs">
-                    <thead class="text-[10px] uppercase text-slate-400 font-bold border-b border-slate-100">
+                    <thead class="text-[10px] uppercase text-slate-400 font-bold bg-slate-50 border-b border-slate-100 sticky top-0">
                         <tr>
                             <th class="py-2.5 px-3">Usuario</th>
                             <th class="py-2.5 px-3">Correo</th>
-                            <th class="py-2.5 px-3">Rol</th>
+                            <th class="py-2.5 px-3">Rol Solicitado</th>
                             <th class="py-2.5 px-3 text-center">Estado</th>
-                            <th class="py-2.5 px-3 text-right">Acción</th>
+                            <th class="py-2.5 px-3 text-right">Acciones de Autorización</th>
                         </tr>
                     </thead>
                     <tbody id="usersTableBody" class="divide-y divide-slate-100">
@@ -896,8 +920,8 @@
             </div>
 
             <div class="pt-3 border-t border-slate-100 flex justify-between items-center text-xs font-heading">
-                <span class="text-slate-400 text-[11px]"><i class="fa-solid fa-shield-halved text-indigo-500 mr-1"></i> Control de acceso basado en roles SAT</span>
-                <button onclick="closeModal('usersModal')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-5 py-2 rounded-xl">Entendido</button>
+                <span class="text-slate-400 text-[11px]"><i class="fa-solid fa-shield-halved text-indigo-500 mr-1"></i> Control de acceso seguro MACH Contadores SAT</span>
+                <button type="button" onclick="closeModal('usersModal')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-5 py-2 rounded-xl transition shadow-sm">Entendido</button>
             </div>
         </div>
     </div>
@@ -993,14 +1017,6 @@
 
         // CONSTANTES Y CONFIGURACIÓN AUTH
         const ADMIN_EMAIL_DEFAULT = "al22020503@itsa.edu.mx";
-        const DEFAULT_DEMO_USER = {
-            id: 1,
-            name: "CP Admin MACH",
-            email: "al22020503@itsa.edu.mx",
-            role: "admin",
-            status: "approved",
-            isAdmin: true
-        };
 
         // STATE MANAGERS
         let currentUser = null;
@@ -1020,9 +1036,11 @@
             const formLogin = document.getElementById('formLogin');
             const formRegister = document.getElementById('formRegister');
             const loginAlert = document.getElementById('loginAlert');
+            const loginInfo = document.getElementById('loginInfo');
             const registerAlert = document.getElementById('registerAlert');
 
             if (loginAlert) loginAlert.classList.add('hidden');
+            if (loginInfo) loginInfo.classList.add('hidden');
             if (registerAlert) registerAlert.classList.add('hidden');
 
             if (tab === 'login') {
@@ -1061,8 +1079,9 @@
                 ? (names[0][0] + names[1][0]).toUpperCase()
                 : (names[0].slice(0, 2)).toUpperCase();
 
-            const roleLabel = currentUser.isAdmin 
-                ? 'Administrador' 
+            const isMasterAdmin = currentUser.email?.toLowerCase() === ADMIN_EMAIL_DEFAULT.toLowerCase();
+            const roleLabel = isMasterAdmin
+                ? 'Administrador Principal' 
                 : (currentUser.role === 'assistant' ? 'Contador Asistente' : (currentUser.role === 'fiscal' ? 'Auxiliar Fiscal' : 'Contador'));
 
             // Sidebar User Info
@@ -1080,16 +1099,16 @@
             if (headerAvatar) headerAvatar.textContent = initials;
             if (headerName) headerName.textContent = currentUser.name ? currentUser.name.split(' ')[0] : 'Usuario';
             if (headerRoleBadge) {
-                headerRoleBadge.textContent = currentUser.isAdmin ? 'Admin' : 'Contador';
-                headerRoleBadge.className = currentUser.isAdmin 
+                headerRoleBadge.textContent = isMasterAdmin ? 'Admin' : 'Contador';
+                headerRoleBadge.className = isMasterAdmin 
                     ? "text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200 font-bold"
                     : "text-[9px] px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200 font-bold";
             }
 
-            // Opción de Administración en Sidebar
+            // Opción de Administración en Sidebar (solo visible para el Administrador Principal)
             const navAdminUsers = document.getElementById('navAdminUsers');
             if (navAdminUsers) {
-                if (currentUser.isAdmin) {
+                if (isMasterAdmin) {
                     navAdminUsers.classList.remove('hidden');
                     navAdminUsers.classList.add('flex');
                 } else {
@@ -1117,7 +1136,6 @@
         }
 
         async function checkAuthSession() {
-            // Revisar si hay sesión guardada en localStorage
             const savedSession = localStorage.getItem('fiscal_user_session');
             const savedToken = localStorage.getItem('fiscal_user_token');
 
@@ -1125,6 +1143,16 @@
                 try {
                     currentUser = JSON.parse(savedSession);
                     authToken = savedToken || '';
+
+                    // Si la sesión guardada corresponde a una cuenta no autorizada o demo vieja, purgarla
+                    if (currentUser && currentUser.status && currentUser.status !== 'approved' && currentUser.email?.toLowerCase() !== ADMIN_EMAIL_DEFAULT) {
+                        throw new Error("Cuenta no aprobada");
+                    }
+
+                    if (authToken && (authToken.startsWith('demo-token-') || authToken === 'local-token-admin')) {
+                        throw new Error("Token demo inválido");
+                    }
+
                     showAppScreen();
 
                     // Validar en segundo plano con el backend
@@ -1135,16 +1163,21 @@
                         .then(r => r.ok ? r.json() : null)
                         .then(data => {
                             if (data?.user) {
+                                if (data.user.status !== 'approved') {
+                                    handleAuthLogout(false);
+                                    return;
+                                }
                                 currentUser = data.user;
                                 localStorage.setItem('fiscal_user_session', JSON.stringify(currentUser));
                                 updateUserUI();
                             }
                         })
-                        .catch(() => { /* Funciona offline de forma transparente */ });
+                        .catch(() => { /* Funciona offline si ya estaba validado */ });
                     }
                     return;
                 } catch (e) {
                     localStorage.removeItem('fiscal_user_session');
+                    localStorage.removeItem('fiscal_user_token');
                 }
             }
 
@@ -1159,6 +1192,7 @@
             const rememberInput = document.getElementById('loginRemember');
             const alertBox = document.getElementById('loginAlert');
             const alertMsg = document.getElementById('loginAlertMsg');
+            const loginInfo = document.getElementById('loginInfo');
             const submitBtn = document.getElementById('loginSubmitBtn');
             const btnText = document.getElementById('loginBtnText');
 
@@ -1166,11 +1200,12 @@
             const password = passwordInput.value;
 
             alertBox.classList.add('hidden');
+            if (loginInfo) loginInfo.classList.add('hidden');
             submitBtn.disabled = true;
-            btnText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Verificando...`;
+            btnText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Verificando credenciales...`;
 
             try {
-                // 1. Intentar autenticar contra el backend (Netlify Functions)
+                // 1. Autenticación con backend (Netlify Functions)
                 const res = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1185,49 +1220,76 @@
                     return;
                 }
 
-                // 2. Si el backend responde con error de credenciales
-                if (res.status === 401 || res.status === 400 || res.status === 403) {
-                    throw new Error(data.error || 'Correo o contraseña incorrectos');
+                if (data.error) {
+                    throw new Error(data.error);
                 }
 
-                throw new Error(data.error || 'No se pudo conectar al servidor de autenticación');
+                throw new Error('No se pudo verificar el inicio de sesión');
             } catch (err) {
-                // 3. Fallback inteligente: Modo local / offline
-                const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
-                const foundUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
-
-                if (foundUser) {
-                    const sessionUser = {
-                        id: foundUser.id,
-                        name: foundUser.name,
-                        email: foundUser.email,
-                        role: foundUser.role,
-                        status: foundUser.status || 'approved',
-                        isAdmin: foundUser.email === ADMIN_EMAIL_DEFAULT || foundUser.role === 'admin'
-                    };
-                    completeLogin(sessionUser, 'local-token-' + Date.now(), rememberInput.checked);
-                    showToast(`¡Bienvenido, ${sessionUser.name}!`);
+                // Si el servidor devolvió un mensaje específico (pendiente de aprobación, cuenta rechazada, etc.)
+                if (err.message && (
+                    err.message.includes('pendiente') || 
+                    err.message.includes('rechazada') || 
+                    err.message.includes('incorrectos') ||
+                    err.message.includes('no autorizado')
+                )) {
+                    alertMsg.textContent = err.message;
+                    alertBox.classList.remove('hidden');
                     return;
                 }
 
-                // Si es la cuenta demo de administrador
-                if (email === ADMIN_EMAIL_DEFAULT && (password === 'admin123' || password === 'admin' || password.length >= 4)) {
-                    completeLogin(DEFAULT_DEMO_USER, 'local-token-admin', rememberInput.checked);
+                // Fallback offline estricto:
+                // Únicamente la cuenta de Administrador Principal con su contraseña designada
+                if (email === ADMIN_EMAIL_DEFAULT && password === 'Yeriel2901') {
+                    const masterAdmin = {
+                        id: 1,
+                        name: "Administrador Principal",
+                        email: ADMIN_EMAIL_DEFAULT,
+                        role: "admin",
+                        status: "approved",
+                        isAdmin: true
+                    };
+                    completeLogin(masterAdmin, 'token-master-' + Date.now(), rememberInput.checked);
                     showToast("¡Sesión iniciada como Administrador Principal!");
                     return;
                 }
 
-                alertMsg.textContent = err.message || "Credenciales no válidas. Verifica correo y contraseña.";
+                // Verificación de usuarios locales creados fuera de línea
+                const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
+                const foundUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
+
+                if (foundUser) {
+                    if (foundUser.status === 'pending') {
+                        alertMsg.textContent = "Tu cuenta aún se encuentra pendiente de autorización por el administrador.";
+                        alertBox.classList.remove('hidden');
+                        return;
+                    }
+                    if (foundUser.status === 'rejected') {
+                        alertMsg.textContent = "Tu solicitud de acceso ha sido rechazada por el administrador.";
+                        alertBox.classList.remove('hidden');
+                        return;
+                    }
+                    if (foundUser.status === 'approved') {
+                        const sessionUser = {
+                            id: foundUser.id,
+                            name: foundUser.name,
+                            email: foundUser.email,
+                            role: foundUser.role,
+                            status: 'approved',
+                            isAdmin: foundUser.email === ADMIN_EMAIL_DEFAULT
+                        };
+                        completeLogin(sessionUser, 'local-token-' + Date.now(), rememberInput.checked);
+                        showToast(`¡Bienvenido, ${sessionUser.name}!`);
+                        return;
+                    }
+                }
+
+                alertMsg.textContent = err.message || "Correo o contraseña incorrectos.";
                 alertBox.classList.remove('hidden');
             } finally {
                 submitBtn.disabled = false;
                 btnText.innerHTML = `Iniciar Sesión`;
             }
-        }
-
-        function quickDemoLogin() {
-            completeLogin(DEFAULT_DEMO_USER, 'demo-token-' + Date.now(), true);
-            showToast("Acceso concedido: CP Admin MACH");
         }
 
         async function handleAuthRegister(e) {
@@ -1239,6 +1301,8 @@
             const passwordConfirm = document.getElementById('regPasswordConfirm').value;
             const alertBox = document.getElementById('registerAlert');
             const alertMsg = document.getElementById('registerAlertMsg');
+            const loginInfo = document.getElementById('loginInfo');
+            const loginInfoMsg = document.getElementById('loginInfoMsg');
             const submitBtn = document.getElementById('registerSubmitBtn');
             const btnText = document.getElementById('registerBtnText');
 
@@ -1257,10 +1321,10 @@
             }
 
             submitBtn.disabled = true;
-            btnText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Registrando...`;
+            btnText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Enviando solicitud...`;
 
             try {
-                // 1. Intentar registrar en el Backend
+                // 1. Enviar solicitud de registro al Backend
                 const res = await fetch('/api/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1269,19 +1333,39 @@
 
                 const data = await res.json().catch(() => ({}));
 
-                if (res.ok && data.user) {
-                    completeLogin(data.user, data.token, true);
-                    showToast(`¡Cuenta registrada exitosamente! Bienvenido, ${data.user.name}`);
-                    return;
+                if (res.ok) {
+                    if (data.pendingApproval || data.user?.status === 'pending') {
+                        // Cambiar al tab de inicio de sesión y mostrar aviso informativo
+                        switchAuthTab('login');
+                        if (loginInfo) {
+                            loginInfoMsg.textContent = data.message || "Tu solicitud de registro ha sido enviada con éxito. La cuenta del administrador (al22020503@itsa.edu.mx) debe autorizar tu acceso antes de que puedas iniciar sesión.";
+                            loginInfo.classList.remove('hidden');
+                        }
+                        showToast("Solicitud enviada. En espera de autorización del Administrador.");
+                        document.getElementById('formRegister').reset();
+                        return;
+                    }
+
+                    if (data.user && data.user.isAdmin) {
+                        completeLogin(data.user, data.token, true);
+                        showToast(`¡Administrador autenticado con éxito! Bienvenido, ${data.user.name}`);
+                        return;
+                    }
                 }
 
                 if (res.status === 409) {
-                    throw new Error(data.error || "Este correo ya está registrado");
+                    throw new Error(data.error || "Este correo ya está registrado. Inicia sesión directamente.");
                 }
 
                 throw new Error(data.error || "Error al procesar el registro");
             } catch (err) {
-                // 2. Fallback local / offline
+                if (err.message && (err.message.includes("ya está registrado") || err.message.includes("válido"))) {
+                    alertMsg.textContent = err.message;
+                    alertBox.classList.remove('hidden');
+                    return;
+                }
+
+                // Fallback local / offline: guardar en modo pendiente
                 const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
                 if (localUsers.some(u => u.email.toLowerCase() === email)) {
                     alertMsg.textContent = "Este correo electrónico ya se encuentra registrado. Inicia sesión.";
@@ -1296,7 +1380,7 @@
                     email,
                     password,
                     role: isAdmin ? 'admin' : role,
-                    status: 'approved',
+                    status: isAdmin ? 'approved' : 'pending',
                     isAdmin,
                     createdAt: new Date().toISOString()
                 };
@@ -1304,20 +1388,31 @@
                 localUsers.push(newUser);
                 localStorage.setItem('fiscal_local_users', JSON.stringify(localUsers));
 
+                if (!isAdmin) {
+                    switchAuthTab('login');
+                    if (loginInfo) {
+                        loginInfoMsg.textContent = "Tu solicitud de registro ha sido guardada. El Administrador Principal (al22020503@itsa.edu.mx) debe autorizar tu cuenta desde su panel de control antes de que puedas ingresar.";
+                        loginInfo.classList.remove('hidden');
+                    }
+                    showToast("Solicitud enviada. En espera de autorización.");
+                    document.getElementById('formRegister').reset();
+                    return;
+                }
+
                 const sessionUser = {
                     id: newUser.id,
                     name: newUser.name,
                     email: newUser.email,
-                    role: newUser.role,
-                    status: newUser.status,
-                    isAdmin: newUser.isAdmin
+                    role: 'admin',
+                    status: 'approved',
+                    isAdmin: true
                 };
 
                 completeLogin(sessionUser, 'local-token-' + Date.now(), true);
-                showToast(`¡Cuenta creada con éxito! Bienvenido, ${newUser.name}`);
+                showToast(`¡Cuenta de administrador configurada! Bienvenido, ${newUser.name}`);
             } finally {
                 submitBtn.disabled = false;
-                btnText.innerHTML = `Crear Mi Cuenta e Ingresar`;
+                btnText.innerHTML = `Enviar Solicitud de Registro`;
             }
         }
 
@@ -1335,8 +1430,8 @@
             showAppScreen();
         }
 
-        async function handleAuthLogout() {
-            if (!confirm("¿Deseas cerrar la sesión actual?")) return;
+        async function handleAuthLogout(showConfirm = true) {
+            if (showConfirm && !confirm("¿Deseas cerrar la sesión actual?")) return;
 
             try {
                 await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
@@ -1353,22 +1448,22 @@
         }
 
         // ==========================================
-        // GESTIÓN DE USUARIOS (PANEL ADMINISTRADOR)
+        // GESTIÓN DE USUARIOS Y AUTORIZACIÓN (ADMIN)
         // ==========================================
 
         async function openUsersModal() {
-            if (!currentUser || !currentUser.isAdmin) {
-                alert("Acceso exclusivo para administradores.");
+            const isMasterAdmin = currentUser && currentUser.email?.toLowerCase() === ADMIN_EMAIL_DEFAULT.toLowerCase();
+            if (!isMasterAdmin) {
+                alert("Acceso denegado: este panel es exclusivo para la cuenta del Administrador Principal (" + ADMIN_EMAIL_DEFAULT + ").");
                 return;
             }
 
             const tbody = document.getElementById('usersTableBody');
-            tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Cargando usuarios...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Cargando solicitudes y usuarios...</td></tr>`;
             openModal('usersModal');
 
             try {
                 let usersList = [];
-                // Intentar leer de API
                 const res = await fetch('/api/users', {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
@@ -1376,70 +1471,142 @@
                 if (res.ok) {
                     usersList = await res.json();
                 } else {
-                    throw new Error("API no disponible");
+                    throw new Error("API de usuarios no disponible");
                 }
 
                 renderUsersTable(usersList);
             } catch (e) {
-                // Cargar usuarios locales
+                // Fallback en almacenamiento local
+                const adminAccount = {
+                    id: 1,
+                    name: "Administrador Principal",
+                    email: ADMIN_EMAIL_DEFAULT,
+                    role: "admin",
+                    status: "approved",
+                    isAdmin: true,
+                    createdAt: new Date().toISOString()
+                };
+
                 const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
-                const combined = [
-                    DEFAULT_DEMO_USER,
-                    ...localUsers.map(u => ({
+                const otherUsers = localUsers
+                    .filter(u => u.email?.toLowerCase() !== ADMIN_EMAIL_DEFAULT.toLowerCase())
+                    .map(u => ({
                         id: u.id,
                         name: u.name,
                         email: u.email,
-                        role: u.role,
-                        status: u.status || 'approved',
-                        isAdmin: u.email === ADMIN_EMAIL_DEFAULT
-                    }))
-                ];
-                // Remover duplicados por email
-                const uniqueUsers = Array.from(new Map(combined.map(u => [u.email, u])).values());
-                renderUsersTable(uniqueUsers);
+                        role: u.role || 'accountant',
+                        status: u.status || 'pending',
+                        isAdmin: false,
+                        createdAt: u.createdAt || new Date().toISOString()
+                    }));
+
+                const combined = [adminAccount, ...otherUsers];
+                renderUsersTable(combined);
             }
         }
 
         function renderUsersTable(users) {
             const tbody = document.getElementById('usersTableBody');
+            const pendingBadge = document.getElementById('usersPendingBadge');
             tbody.innerHTML = '';
 
+            const pendingUsers = (users || []).filter(u => u.status === 'pending');
+            const pendingCount = pendingUsers.length;
+
+            if (pendingBadge) {
+                if (pendingCount > 0) {
+                    pendingBadge.textContent = `${pendingCount} solicitud${pendingCount > 1 ? 'es' : ''} pendiente${pendingCount > 1 ? 's' : ''}`;
+                    pendingBadge.className = "text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 inline-flex items-center gap-1";
+                } else {
+                    pendingBadge.textContent = "Al día (0 pendientes)";
+                    pendingBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1";
+                }
+            }
+
             if (!users || users.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">No hay usuarios registrados.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">No hay cuentas ni solicitudes en la base de datos.</td></tr>`;
                 return;
             }
 
-            users.forEach(u => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+            // Ordenar: primero pendientes, luego resto
+            const sorted = [...users].sort((a, b) => {
+                if (a.status === 'pending' && b.status !== 'pending') return -1;
+                if (a.status !== 'pending' && b.status === 'pending') return 1;
+                return 0;
+            });
 
-                const isMasterAdmin = u.email === ADMIN_EMAIL_DEFAULT;
-                let statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">Aprobado</span>`;
+            sorted.forEach(u => {
+                const tr = document.createElement('tr');
+                const isMasterAdmin = u.email?.toLowerCase() === ADMIN_EMAIL_DEFAULT.toLowerCase();
+
+                let statusBadge = '';
                 if (u.status === 'pending') {
-                    statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Pendiente</span>`;
-                } else if (u.status === 'rejected') {
-                    statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">Rechazado</span>`;
+                    statusBadge = `<span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 inline-flex items-center gap-1.5"><i class="fa-solid fa-clock-rotate-left"></i> Por Autorizar</span>`;
+                    tr.className = "bg-amber-50/40 hover:bg-amber-50/80 transition border-b border-amber-100";
+                } else if (u.status === 'approved') {
+                    statusBadge = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1.5"><i class="fa-solid fa-circle-check"></i> Autorizado</span>`;
+                    tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+                } else {
+                    statusBadge = `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 inline-flex items-center gap-1.5"><i class="fa-solid fa-circle-xmark"></i> Rechazado</span>`;
+                    tr.className = "hover:bg-slate-50 transition border-b border-slate-100 opacity-70";
+                }
+
+                const roleName = u.role === 'admin' ? 'Administrador' : (u.role === 'assistant' ? 'Contador Asistente' : (u.role === 'fiscal' ? 'Auxiliar Fiscal' : 'Contador Titular'));
+
+                let actionButtons = '';
+                if (isMasterAdmin) {
+                    actionButtons = `<span class="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-lg inline-flex items-center gap-1"><i class="fa-solid fa-crown text-amber-500"></i> Administrador Designado (Tú)</span>`;
+                } else if (u.status === 'pending') {
+                    actionButtons = `
+                        <div class="flex items-center justify-end gap-1.5">
+                            <button type="button" onclick="changeUserStatus(${u.id}, 'approved')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-extrabold transition shadow-sm flex items-center gap-1">
+                                <i class="fa-solid fa-check"></i> Autorizar
+                            </button>
+                            <button type="button" onclick="changeUserStatus(${u.id}, 'rejected')" class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1">
+                                <i class="fa-solid fa-xmark"></i> Rechazar
+                            </button>
+                            <button type="button" onclick="deleteUserAccount(${u.id})" title="Eliminar solicitud" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">
+                                <i class="fa-regular fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    `;
+                } else if (u.status === 'approved') {
+                    actionButtons = `
+                        <div class="flex items-center justify-end gap-1.5">
+                            <button type="button" onclick="changeUserStatus(${u.id}, 'pending')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1">
+                                <i class="fa-solid fa-pause"></i> Suspender
+                            </button>
+                            <button type="button" onclick="deleteUserAccount(${u.id})" title="Eliminar usuario" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">
+                                <i class="fa-regular fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    actionButtons = `
+                        <div class="flex items-center justify-end gap-1.5">
+                            <button type="button" onclick="changeUserStatus(${u.id}, 'approved')" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1">
+                                <i class="fa-solid fa-rotate-left"></i> Reconsiderar / Autorizar
+                            </button>
+                            <button type="button" onclick="deleteUserAccount(${u.id})" title="Eliminar usuario" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">
+                                <i class="fa-regular fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    `;
                 }
 
                 tr.innerHTML = `
                     <td class="py-3 px-3">
-                        <div class="font-bold text-navy-900 font-heading">${u.name || 'Sin nombre'}</div>
-                        <div class="text-[10px] text-slate-400">${isMasterAdmin ? 'Administrador Principal' : 'Personal Contable'}</div>
+                        <div class="font-bold text-navy-900 font-heading text-xs">${u.name || 'Sin nombre'}</div>
+                        <div class="text-[10px] text-slate-400">${isMasterAdmin ? 'Acceso total y autorización' : (u.createdAt ? 'Registrado: ' + new Date(u.createdAt).toLocaleDateString('es-MX') : '')}</div>
                     </td>
-                    <td class="py-3 px-3 font-mono text-[11px] text-slate-600">${u.email}</td>
+                    <td class="py-3 px-3 font-mono text-[11px] text-slate-600 font-medium">${u.email}</td>
                     <td class="py-3 px-3">
-                        <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[10px] font-bold">
-                            ${u.role || 'accountant'}
+                        <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold font-heading">
+                            ${roleName}
                         </span>
                     </td>
                     <td class="py-3 px-3 text-center">${statusBadge}</td>
-                    <td class="py-3 px-3 text-right">
-                        ${isMasterAdmin ? '<span class="text-slate-400 text-[10px] font-bold">Protegido</span>' : `
-                            <button onclick="changeUserStatus(${u.id}, '${u.status === 'approved' ? 'pending' : 'approved'}')" class="px-2.5 py-1 rounded-lg text-[10px] font-bold border transition ${u.status === 'approved' ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}">
-                                ${u.status === 'approved' ? 'Suspender' : 'Aprobar'}
-                            </button>
-                        `}
-                    </td>
+                    <td class="py-3 px-3 text-right">${actionButtons}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -1457,7 +1624,7 @@
                 });
 
                 if (res.ok) {
-                    showToast(`Estado de usuario actualizado a "${newStatus}"`);
+                    showToast(newStatus === 'approved' ? "¡Usuario autorizado con éxito!" : `Estado actualizado a "${newStatus}"`);
                     openUsersModal();
                     return;
                 }
@@ -1469,9 +1636,64 @@
             if (idx !== -1) {
                 localUsers[idx].status = newStatus;
                 localStorage.setItem('fiscal_local_users', JSON.stringify(localUsers));
-                showToast(`Estado local actualizado a "${newStatus}"`);
+                showToast(newStatus === 'approved' ? "¡Usuario autorizado localmente!" : `Estado local actualizado a "${newStatus}"`);
                 openUsersModal();
             }
+        }
+
+        async function deleteUserAccount(userId) {
+            if (!confirm("¿Deseas eliminar permanentemente esta cuenta/solicitud?")) return;
+
+            try {
+                const res = await fetch(`/api/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (res.ok) {
+                    showToast("Cuenta eliminada correctamente.");
+                    openUsersModal();
+                    return;
+                }
+            } catch (e) {}
+
+            // Fallback en almacenamiento local
+            let localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
+            localUsers = localUsers.filter(u => u.id !== userId);
+            localStorage.setItem('fiscal_local_users', JSON.stringify(localUsers));
+            showToast("Cuenta eliminada del almacenamiento local.");
+            openUsersModal();
+        }
+
+        async function resetAllAccountsConfirm() {
+            if (!confirm("¿Confirmas eliminar todas las cuentas de la base de datos y conservar ÚNICAMENTE la cuenta del Administrador Principal (" + ADMIN_EMAIL_DEFAULT + ")?")) {
+                return;
+            }
+
+            try {
+                // Obtener todos los usuarios de la API y eliminar los que no sean admin
+                const res = await fetch('/api/users', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (res.ok) {
+                    const list = await res.json();
+                    for (const u of list) {
+                        if (u.email?.toLowerCase() !== ADMIN_EMAIL_DEFAULT.toLowerCase()) {
+                            await fetch(`/api/users/${u.id}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${authToken}` }
+                            }).catch(() => {});
+                        }
+                    }
+                }
+            } catch (e) {}
+
+            // Limpiar cuentas locales
+            localStorage.setItem('fiscal_local_users', JSON.stringify([]));
+            showToast("✓ Cuentas depuradas. Solo queda la cuenta Administradora Principal.");
+            openUsersModal();
         }
 
         // ==========================================

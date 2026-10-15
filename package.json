@@ -7,7 +7,8 @@
     "build": "node -e \"const fs=require('fs'); if(!fs.existsSync('public')){fs.mkdirSync('public');} fs.copyFileSync('index.html', 'public/index.html');\"",
     "dev": "netlify dev",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "esbuild scripts/seed-admin.ts --bundle --platform=node --format=esm --outfile=scripts/seed-admin.mjs && node scripts/seed-admin.mjs"
   },
   "dependencies": {
     "@netlify/database": "^2.0.1",

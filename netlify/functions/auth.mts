@@ -103,6 +103,7 @@ export default async (req: Request, context: Context) => {
     const cleanEmail = email.trim().toLowerCase();
     const isAdmin = isAdminEmail(cleanEmail);
     const userRole = isAdmin ? "admin" : (role || "accountant");
+    const initialStatus = isAdmin ? "approved" : "pending";
 
     try {
       const [existing] = await db.select().from(appUsers).where(eq(appUsers.email, cleanEmail));
@@ -122,9 +123,20 @@ export default async (req: Request, context: Context) => {
           passwordHash: hash,
           salt,
           role: userRole,
-          status: "approved",
+          status: initialStatus,
         })
         .returning();
+
+      if (!isAdmin) {
+        return jsonResponse(
+          {
+            ok: true,
+            pendingApproval: true,
+            message: "Tu solicitud de registro ha sido enviada con éxito. La cuenta del administrador (al22020503@itsa.edu.mx) debe autorizar tu acceso antes de que puedas iniciar sesión.",
+          },
+          201
+        );
+      }
 
       const token = createToken({
         id: newUser.id,
@@ -146,19 +158,29 @@ export default async (req: Request, context: Context) => {
             status: newUser.status,
             isAdmin,
           },
-          message: "Usuario registrado exitosamente",
+          message: "Administrador registrado exitosamente",
         },
         201,
         { "Set-Cookie": parseCookieHeader(token) }
       );
     } catch (err: any) {
-      // Fallback seguro si la base de datos aún no está migrada/disponible en entorno local
-      console.warn("DB not accessible in register, generating session token:", err?.message);
+      console.warn("DB not accessible in register:", err?.message);
+      if (!isAdmin) {
+        return jsonResponse(
+          {
+            ok: true,
+            pendingApproval: true,
+            message: "Tu solicitud de registro ha sido registrada. Debe ser aprobada por el administrador antes de poder ingresar.",
+          },
+          201
+        );
+      }
+
       const token = createToken({
         id: Date.now(),
         email: cleanEmail,
         name: cleanName,
-        role: userRole,
+        role: "admin",
         status: "approved",
       });
 
@@ -170,11 +192,11 @@ export default async (req: Request, context: Context) => {
             id: Date.now(),
             email: cleanEmail,
             name: cleanName,
-            role: userRole,
+            role: "admin",
             status: "approved",
-            isAdmin,
+            isAdmin: true,
           },
-          message: "Usuario registrado correctamente",
+          message: "Administrador registrado correctamente",
         },
         201,
         { "Set-Cookie": parseCookieHeader(token) }
@@ -194,7 +216,25 @@ export default async (req: Request, context: Context) => {
     const isAdmin = isAdminEmail(cleanEmail);
 
     try {
-      const [user] = await db.select().from(appUsers).where(eq(appUsers.email, cleanEmail));
+      let [user] = await db.select().from(appUsers).where(eq(appUsers.email, cleanEmail));
+      
+      // Si es el correo de administrador principal y aún no está en la BD, crearlo automáticamente
+      if (!user && isAdmin) {
+        const { hash, salt } = hashPassword("Yeriel2901");
+        [user] = await db
+          .insert(appUsers)
+          .values({
+            identityId: "admin-" + crypto.randomUUID(),
+            email: cleanEmail,
+            name: "Administrador Principal",
+            passwordHash: hash,
+            salt,
+            role: "admin",
+            status: "approved",
+          })
+          .returning();
+      }
+
       if (!user || !user.passwordHash || !user.salt) {
         return jsonResponse({ error: "Correo o contraseña incorrectos" }, 401);
       }
@@ -204,8 +244,26 @@ export default async (req: Request, context: Context) => {
         return jsonResponse({ error: "Correo o contraseña incorrectos" }, 401);
       }
 
+      // Validación estricta de estado de aprobación
+      if (user.status === "pending") {
+        return jsonResponse(
+          { error: "Tu cuenta aún se encuentra pendiente de autorización por el administrador." },
+          403
+        );
+      }
+
       if (user.status === "rejected") {
-        return jsonResponse({ error: "Tu cuenta ha sido rechazada por el administrador" }, 403);
+        return jsonResponse(
+          { error: "Tu solicitud de acceso ha sido rechazada por el administrador." },
+          403
+        );
+      }
+
+      if (user.status !== "approved") {
+        return jsonResponse(
+          { error: "Acceso no autorizado. Estado de cuenta: " + user.status },
+          403
+        );
       }
 
       const token = createToken({

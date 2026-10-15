@@ -9,7 +9,7 @@ export const appUsers = pgTable("app_users", {
   passwordHash: text("password_hash"),
   salt: text("salt"),
   role: text("role").default("accountant"),
-  status: text().notNull().default("approved"),
+  status: text().notNull().default("pending"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   reviewedAt: timestamp("reviewed_at"),
 });

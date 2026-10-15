@@ -14,6 +14,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Generados y bundles
+scripts/*.mjs
+
 # Archivos del sistema operativo
 .DS_Store
 Thumbs.db

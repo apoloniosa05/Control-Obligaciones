@@ -1,19 +1,29 @@
 import type { Config, Context } from "@netlify/functions";
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import { appUsers } from "../../db/schema.js";
-import { forbidden, getAppUser, isAdminEmail, unauthorized } from "../../lib/auth.js";
+import { ensureAdminAccount, forbidden, getAppUser, isAdminEmail, unauthorized } from "../../lib/auth.js";
 
 const STATUSES = ["pending", "approved", "rejected"];
 
 export default async (req: Request, context: Context) => {
   const user = await getAppUser(req);
   if (!user) return unauthorized();
-  if (!user.isAdmin) return forbidden("Solo el administrador puede gestionar usuarios");
+  if (!user.isAdmin) return forbidden("Solo el administrador principal puede gestionar usuarios");
 
   try {
+    // Garantizar que la cuenta de administrador exista
+    await ensureAdminAccount();
+
     if (req.method === "GET") {
-      const rows = await db.select().from(appUsers).orderBy(desc(appUsers.createdAt));
+      const rows = await db
+        .select()
+        .from(appUsers)
+        .orderBy(
+          sql`CASE WHEN ${appUsers.status} = 'pending' THEN 0 ELSE 1 END`,
+          desc(appUsers.createdAt)
+        );
+
       return Response.json(
         rows.map((r) => ({
           id: r.id,
@@ -32,7 +42,7 @@ export default async (req: Request, context: Context) => {
       const id = Number(context.params.id);
       const { status } = (await req.json().catch(() => ({}))) as { status?: string };
       if (!id || !status || !STATUSES.includes(status)) {
-        return Response.json({ error: "Solicitud inválida" }, { status: 400 });
+        return Response.json({ error: "Solicitud o estado inválido" }, { status: 400 });
       }
       const [target] = await db.select().from(appUsers).where(eq(appUsers.id, id));
       if (!target) return Response.json({ error: "Usuario no encontrado" }, { status: 404 });
@@ -53,6 +63,18 @@ export default async (req: Request, context: Context) => {
         reviewedAt: updated.reviewedAt,
         isAdmin: isAdminEmail(updated.email),
       });
+    }
+
+    if (req.method === "DELETE") {
+      const id = Number(context.params.id);
+      if (!id) return Response.json({ error: "ID de usuario inválido" }, { status: 400 });
+
+      const [target] = await db.select().from(appUsers).where(eq(appUsers.id, id));
+      if (!target) return Response.json({ error: "Usuario no encontrado" }, { status: 404 });
+      if (isAdminEmail(target.email)) return Response.json({ error: "No puedes eliminar al administrador principal" }, { status: 400 });
+
+      await db.delete(appUsers).where(eq(appUsers.id, id));
+      return Response.json({ ok: true, message: "Usuario eliminado correctamente" });
     }
 
     return new Response("Method not allowed", { status: 405 });

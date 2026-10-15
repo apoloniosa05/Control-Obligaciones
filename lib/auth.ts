@@ -1,10 +1,15 @@
 import { getUser } from "@netlify/identity";
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import crypto from "node:crypto";
 import { db } from "../db/index.js";
 import { appUsers } from "../db/schema.js";
 
-const DEFAULT_ADMIN_EMAIL = "al22020503@itsa.edu.mx";
+export const DEFAULT_ADMIN_EMAIL = "al22020503@itsa.edu.mx";
+export const ADMIN_CREDENTIALS = {
+  email: "al22020503@itsa.edu.mx",
+  password: "Yeriel2901",
+};
+
 const JWT_SECRET = process.env.JWT_SECRET || process.env.TOKEN_SECRET || "mach-fiscal-control-secret-key-2026-secure";
 
 export function isAdminEmail(email: string): boolean {
@@ -101,7 +106,7 @@ export async function getAppUser(req?: Request): Promise<AppUser | null> {
           passwordHash: null,
           salt: null,
           role: decoded.role ?? (isAdmin ? "admin" : "accountant"),
-          status: isAdmin ? "approved" : (decoded.status ?? "approved"),
+          status: isAdmin ? "approved" : (decoded.status ?? "pending"),
           createdAt: new Date(),
           reviewedAt: null,
           isAdmin,
@@ -123,7 +128,7 @@ export async function getAppUser(req?: Request): Promise<AppUser | null> {
         if (!row) {
           [row] = await db
             .insert(appUsers)
-            .values({ identityId: user.id, email, name, status: "approved", role: isAdmin ? "admin" : "accountant" })
+            .values({ identityId: user.id, email, name, status: isAdmin ? "approved" : "pending", role: isAdmin ? "admin" : "accountant" })
             .onConflictDoUpdate({ target: appUsers.email, set: { identityId: user.id, name } })
             .returning();
         }
@@ -142,7 +147,7 @@ export async function getAppUser(req?: Request): Promise<AppUser | null> {
           passwordHash: null,
           salt: null,
           role: isAdmin ? "admin" : "accountant",
-          status: "approved",
+          status: isAdmin ? "approved" : "pending",
           createdAt: new Date(),
           reviewedAt: null,
           isAdmin,
@@ -156,8 +161,81 @@ export async function getAppUser(req?: Request): Promise<AppUser | null> {
   return null;
 }
 
+// Garantiza que la cuenta de administrador exista en la base de datos
+export async function ensureAdminAccount(): Promise<typeof appUsers.$inferSelect | null> {
+  try {
+    const adminEmail = (process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
+    const [existing] = await db.select().from(appUsers).where(eq(appUsers.email, adminEmail));
+    if (existing) {
+      if (existing.status !== "approved") {
+        const [updated] = await db
+          .update(appUsers)
+          .set({ status: "approved", role: "admin" })
+          .where(eq(appUsers.id, existing.id))
+          .returning();
+        return updated;
+      }
+      return existing;
+    }
+
+    const { hash, salt } = hashPassword(ADMIN_CREDENTIALS.password);
+    const [created] = await db
+      .insert(appUsers)
+      .values({
+        identityId: "admin-" + crypto.randomUUID(),
+        email: adminEmail,
+        name: "Administrador Principal",
+        passwordHash: hash,
+        salt,
+        role: "admin",
+        status: "approved",
+      })
+      .returning();
+    return created;
+  } catch (err: any) {
+    console.warn("Could not ensure admin in DB:", err?.message);
+    return null;
+  }
+}
+
+// Limpia todos los usuarios de la base de datos y deja ÚNICAMENTE al administrador designado
+export async function resetUsersToOnlyAdmin(): Promise<{ deleted: number; adminEmail: string }> {
+  const adminEmail = (process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
+  const { hash, salt } = hashPassword(ADMIN_CREDENTIALS.password);
+
+  // 1. Eliminar cualquier usuario que no sea el administrador
+  await db.delete(appUsers).where(ne(appUsers.email, adminEmail));
+
+  // 2. Insertar o actualizar la cuenta del administrador
+  const [existing] = await db.select().from(appUsers).where(eq(appUsers.email, adminEmail));
+  if (existing) {
+    await db
+      .update(appUsers)
+      .set({
+        name: "Administrador Principal",
+        passwordHash: hash,
+        salt,
+        role: "admin",
+        status: "approved",
+      })
+      .where(eq(appUsers.id, existing.id));
+  } else {
+    await db.insert(appUsers).values({
+      identityId: "admin-" + crypto.randomUUID(),
+      email: adminEmail,
+      name: "Administrador Principal",
+      passwordHash: hash,
+      salt,
+      role: "admin",
+      status: "approved",
+    });
+  }
+
+  return { deleted: 1, adminEmail };
+}
+
 export const unauthorized = (msg = "No has iniciado sesión") =>
   Response.json({ error: msg }, { status: 401 });
 
-export const forbidden = (msg = "Tu cuenta aún no ha sido aprobada") =>
+export const forbidden = (msg = "Tu cuenta aún no ha sido aprobada por el administrador") =>
   Response.json({ error: msg }, { status: 403 });
