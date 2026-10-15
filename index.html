@@ -18,6 +18,10 @@
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
+    <!-- Firebase SDK (100% Gratuito en la Nube - Sincronización en Tiempo Real entre Dispositivos) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -1018,6 +1022,106 @@
         // CONSTANTES Y CONFIGURACIÓN AUTH
         const ADMIN_EMAIL_DEFAULT = "al22020503@itsa.edu.mx";
 
+        // ==========================================
+        // CONFIGURACIÓN DE FIREBASE FIRESTORE (NUBE EN TIEMPO REAL)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAmPC5LUW8VI37QlNxorv7-wzHSRSgxgzk",
+            authDomain: "control-fiscal-mach.firebaseapp.com",
+            projectId: "control-fiscal-mach",
+            storageBucket: "control-fiscal-mach.firebasestorage.app",
+            messagingSenderId: "78858054380",
+            appId: "1:78858054380:web:1426e5760cd6cd407893c9",
+            measurementId: "G-4LTT6CGHKG"
+        };
+
+        let firestoreDb = null;
+        try {
+            if (typeof firebase !== 'undefined') {
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                firestoreDb = firebase.firestore();
+                console.log("✓ Firebase Firestore conectado exitosamente a la nube.");
+            }
+        } catch (e) {
+            console.error("Error inicializando Firebase:", e);
+        }
+
+        // Helper de Hashing SHA-256 en navegador
+        async function hashPasswordBrowser(password, salt = "mach-master-salt-admin") {
+            try {
+                const enc = new TextEncoder();
+                const data = enc.encode(salt + ":" + password + ":mach-control-2026-salt");
+                const hashBuf = await crypto.subtle.digest("SHA-256", data);
+                return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+            } catch (err) {
+                let h = 0;
+                const str = salt + password;
+                for (let i = 0; i < str.length; i++) {
+                    h = ((h << 5) - h) + str.charCodeAt(i);
+                    h |= 0;
+                }
+                return 'fb-hash-' + Math.abs(h);
+            }
+        }
+
+        function generateSalt() {
+            try {
+                const arr = new Uint8Array(16);
+                crypto.getRandomValues(arr);
+                return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+            } catch {
+                return 'salt-' + Math.random().toString(36).substring(2);
+            }
+        }
+
+        // Garantiza que la cuenta del Administrador Principal siempre exista en la nube
+        async function ensureCloudAdmin() {
+            if (!firestoreDb) return;
+            try {
+                const snap = await firestoreDb.collection("app_users")
+                    .where("email", "==", ADMIN_EMAIL_DEFAULT)
+                    .get();
+
+                const salt = "mach-master-salt-admin";
+                const hash = await hashPasswordBrowser("Yeriel2901", salt);
+
+                if (snap.empty) {
+                    await firestoreDb.collection("app_users").add({
+                        email: ADMIN_EMAIL_DEFAULT,
+                        name: "Administrador Principal",
+                        role: "admin",
+                        status: "approved",
+                        passwordHash: hash,
+                        salt: salt,
+                        isAdmin: true,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    console.log("✓ Administrador Principal aprovisionado en Firestore.");
+                } else {
+                    const adminDoc = snap.docs[0];
+                    if (adminDoc.data().status !== "approved" || adminDoc.data().passwordHash !== hash) {
+                        await adminDoc.ref.update({
+                            status: "approved",
+                            role: "admin",
+                            passwordHash: hash,
+                            salt: salt,
+                            isAdmin: true
+                        });
+                    }
+                }
+            } catch (err) {
+                console.warn("ensureCloudAdmin aviso:", err?.message);
+            }
+        }
+
+        // Ejecutar verificación en nube al cargar
+        if (firestoreDb) {
+            ensureCloudAdmin();
+        }
+
         // STATE MANAGERS
         let currentUser = null;
         let authToken = localStorage.getItem('fiscal_user_token') || '';
@@ -1155,24 +1259,20 @@
 
                     showAppScreen();
 
-                    // Validar en segundo plano con el backend
-                    if (authToken) {
-                        fetch('/api/auth/me', {
-                            headers: { 'Authorization': `Bearer ${authToken}` }
-                        })
-                        .then(r => r.ok ? r.json() : null)
-                        .then(data => {
-                            if (data?.user) {
-                                if (data.user.status !== 'approved') {
-                                    handleAuthLogout(false);
-                                    return;
+                    // Validar estado de cuenta en Firestore en segundo plano
+                    if (firestoreDb && currentUser?.email) {
+                        firestoreDb.collection("app_users")
+                            .where("email", "==", currentUser.email.toLowerCase())
+                            .get()
+                            .then(snap => {
+                                if (!snap.empty) {
+                                    const uData = snap.docs[0].data();
+                                    if (uData.status !== 'approved' && currentUser.email.toLowerCase() !== ADMIN_EMAIL_DEFAULT) {
+                                        handleAuthLogout(false);
+                                    }
                                 }
-                                currentUser = data.user;
-                                localStorage.setItem('fiscal_user_session', JSON.stringify(currentUser));
-                                updateUserUI();
-                            }
-                        })
-                        .catch(() => { /* Funciona offline si ya estaba validado */ });
+                            })
+                            .catch(() => {});
                     }
                     return;
                 } catch (e) {
@@ -1205,41 +1305,72 @@
             btnText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Verificando credenciales...`;
 
             try {
-                // 1. Autenticación con backend (Netlify Functions)
-                const res = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
+                // 1. AUTENTICACIÓN EN LA NUBE (FIREBASE FIRESTORE)
+                if (firestoreDb) {
+                    await ensureCloudAdmin();
+                    const snap = await firestoreDb.collection("app_users")
+                        .where("email", "==", email)
+                        .get();
 
-                const data = await res.json().catch(() => ({}));
+                    if (snap.empty) {
+                        // Si es el Administrador Principal con su clave designada, permitir y aprovisionar
+                        if (email === ADMIN_EMAIL_DEFAULT && password === "Yeriel2901") {
+                            await ensureCloudAdmin();
+                            const adminUser = {
+                                id: "cloud-admin-master",
+                                name: "Administrador Principal",
+                                email: ADMIN_EMAIL_DEFAULT,
+                                role: "admin",
+                                status: "approved",
+                                isAdmin: true
+                            };
+                            completeLogin(adminUser, 'fb-token-admin-' + Date.now(), rememberInput.checked);
+                            showToast("¡Sesión iniciada como Administrador Principal en la nube!");
+                            return;
+                        }
+                        throw new Error("Correo o contraseña incorrectos.");
+                    }
 
-                if (res.ok && data.user) {
-                    completeLogin(data.user, data.token, rememberInput.checked);
-                    showToast(`¡Bienvenido de vuelta, ${data.user.name || 'Contador'}!`);
-                    return;
-                }
+                    const userDoc = snap.docs[0];
+                    const uData = userDoc.data();
 
-                if (data.error) {
-                    throw new Error(data.error);
-                }
+                    // Verificar contraseña
+                    const testHash = await hashPasswordBrowser(password, uData.salt || "mach-master-salt-admin");
+                    const isMatch = (testHash === uData.passwordHash) || 
+                                    (email === ADMIN_EMAIL_DEFAULT && password === "Yeriel2901");
 
-                throw new Error('No se pudo verificar el inicio de sesión');
-            } catch (err) {
-                // Si el servidor devolvió un mensaje específico (pendiente de aprobación, cuenta rechazada, etc.)
-                if (err.message && (
-                    err.message.includes('pendiente') || 
-                    err.message.includes('rechazada') || 
-                    err.message.includes('incorrectos') ||
-                    err.message.includes('no autorizado')
-                )) {
-                    alertMsg.textContent = err.message;
-                    alertBox.classList.remove('hidden');
+                    if (!isMatch) {
+                        throw new Error("Correo o contraseña incorrectos.");
+                    }
+
+                    // Validar estado de aprobación
+                    if (uData.status === "pending") {
+                        throw new Error("Tu cuenta aún se encuentra pendiente de autorización por el Administrador Principal.");
+                    }
+
+                    if (uData.status === "rejected") {
+                        throw new Error("Tu solicitud de acceso ha sido rechazada por el administrador.");
+                    }
+
+                    if (uData.status !== "approved") {
+                        throw new Error("Acceso no autorizado. Estado de tu cuenta: " + uData.status);
+                    }
+
+                    const sessionUser = {
+                        id: userDoc.id,
+                        email: uData.email,
+                        name: uData.name || "Usuario",
+                        role: uData.role || "accountant",
+                        status: "approved",
+                        isAdmin: uData.email === ADMIN_EMAIL_DEFAULT || uData.role === "admin"
+                    };
+
+                    completeLogin(sessionUser, 'fb-token-' + userDoc.id, rememberInput.checked);
+                    showToast(`¡Bienvenido de vuelta, ${sessionUser.name}!`);
                     return;
                 }
 
                 // Fallback offline estricto:
-                // Únicamente la cuenta de Administrador Principal con su contraseña designada
                 if (email === ADMIN_EMAIL_DEFAULT && password === 'Yeriel2901') {
                     const masterAdmin = {
                         id: 1,
@@ -1254,36 +1385,8 @@
                     return;
                 }
 
-                // Verificación de usuarios locales creados fuera de línea
-                const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
-                const foundUser = localUsers.find(u => u.email.toLowerCase() === email && u.password === password);
-
-                if (foundUser) {
-                    if (foundUser.status === 'pending') {
-                        alertMsg.textContent = "Tu cuenta aún se encuentra pendiente de autorización por el administrador.";
-                        alertBox.classList.remove('hidden');
-                        return;
-                    }
-                    if (foundUser.status === 'rejected') {
-                        alertMsg.textContent = "Tu solicitud de acceso ha sido rechazada por el administrador.";
-                        alertBox.classList.remove('hidden');
-                        return;
-                    }
-                    if (foundUser.status === 'approved') {
-                        const sessionUser = {
-                            id: foundUser.id,
-                            name: foundUser.name,
-                            email: foundUser.email,
-                            role: foundUser.role,
-                            status: 'approved',
-                            isAdmin: foundUser.email === ADMIN_EMAIL_DEFAULT
-                        };
-                        completeLogin(sessionUser, 'local-token-' + Date.now(), rememberInput.checked);
-                        showToast(`¡Bienvenido, ${sessionUser.name}!`);
-                        return;
-                    }
-                }
-
+                throw new Error("Servicio de base de datos no disponible. Verifica tu conexión a internet.");
+            } catch (err) {
                 alertMsg.textContent = err.message || "Correo o contraseña incorrectos.";
                 alertBox.classList.remove('hidden');
             } finally {
@@ -1321,95 +1424,65 @@
             }
 
             submitBtn.disabled = true;
-            btnText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Enviando solicitud...`;
+            btnText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Enviando solicitud a la nube...`;
 
             try {
-                // 1. Enviar solicitud de registro al Backend
-                const res = await fetch('/api/auth/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, email, password, role })
-                });
+                // REGISTRO EN LA NUBE (FIREBASE FIRESTORE)
+                if (firestoreDb) {
+                    await ensureCloudAdmin();
+                    const existingSnap = await firestoreDb.collection("app_users")
+                        .where("email", "==", email)
+                        .get();
 
-                const data = await res.json().catch(() => ({}));
+                    if (!existingSnap.empty) {
+                        throw new Error("Este correo ya se encuentra registrado. Inicia sesión directamente.");
+                    }
 
-                if (res.ok) {
-                    if (data.pendingApproval || data.user?.status === 'pending') {
-                        // Cambiar al tab de inicio de sesión y mostrar aviso informativo
+                    const salt = generateSalt();
+                    const passwordHash = await hashPasswordBrowser(password, salt);
+                    const isAdmin = email === ADMIN_EMAIL_DEFAULT;
+                    const initialStatus = isAdmin ? "approved" : "pending";
+
+                    await firestoreDb.collection("app_users").add({
+                        name: name || "Contador",
+                        email: email,
+                        role: isAdmin ? "admin" : (role || "accountant"),
+                        status: initialStatus,
+                        passwordHash: passwordHash,
+                        salt: salt,
+                        isAdmin: isAdmin,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    if (!isAdmin) {
                         switchAuthTab('login');
                         if (loginInfo) {
-                            loginInfoMsg.textContent = data.message || "Tu solicitud de registro ha sido enviada con éxito. La cuenta del administrador (al22020503@itsa.edu.mx) debe autorizar tu acceso antes de que puedas iniciar sesión.";
+                            loginInfoMsg.textContent = "¡Solicitud registrada en la nube con éxito! El Administrador Principal (" + ADMIN_EMAIL_DEFAULT + ") debe autorizar tu cuenta antes de que puedas iniciar sesión.";
                             loginInfo.classList.remove('hidden');
                         }
-                        showToast("Solicitud enviada. En espera de autorización del Administrador.");
+                        showToast("Solicitud enviada a la nube. En espera de autorización.");
                         document.getElementById('formRegister').reset();
                         return;
                     }
 
-                    if (data.user && data.user.isAdmin) {
-                        completeLogin(data.user, data.token, true);
-                        showToast(`¡Administrador autenticado con éxito! Bienvenido, ${data.user.name}`);
-                        return;
-                    }
+                    const sessionUser = {
+                        id: "admin-" + Date.now(),
+                        name: name,
+                        email: email,
+                        role: "admin",
+                        status: "approved",
+                        isAdmin: true
+                    };
+
+                    completeLogin(sessionUser, 'fb-token-admin', true);
+                    showToast(`¡Cuenta de administrador configurada! Bienvenido, ${sessionUser.name}`);
+                    return;
                 }
 
-                if (res.status === 409) {
-                    throw new Error(data.error || "Este correo ya está registrado. Inicia sesión directamente.");
-                }
-
-                throw new Error(data.error || "Error al procesar el registro");
+                throw new Error("Servicio de base de datos en la nube no disponible. Revisa tu conexión.");
             } catch (err) {
-                if (err.message && (err.message.includes("ya está registrado") || err.message.includes("válido"))) {
-                    alertMsg.textContent = err.message;
-                    alertBox.classList.remove('hidden');
-                    return;
-                }
-
-                // Fallback local / offline: guardar en modo pendiente
-                const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
-                if (localUsers.some(u => u.email.toLowerCase() === email)) {
-                    alertMsg.textContent = "Este correo electrónico ya se encuentra registrado. Inicia sesión.";
-                    alertBox.classList.remove('hidden');
-                    return;
-                }
-
-                const isAdmin = email === ADMIN_EMAIL_DEFAULT;
-                const newUser = {
-                    id: Date.now(),
-                    name,
-                    email,
-                    password,
-                    role: isAdmin ? 'admin' : role,
-                    status: isAdmin ? 'approved' : 'pending',
-                    isAdmin,
-                    createdAt: new Date().toISOString()
-                };
-
-                localUsers.push(newUser);
-                localStorage.setItem('fiscal_local_users', JSON.stringify(localUsers));
-
-                if (!isAdmin) {
-                    switchAuthTab('login');
-                    if (loginInfo) {
-                        loginInfoMsg.textContent = "Tu solicitud de registro ha sido guardada. El Administrador Principal (al22020503@itsa.edu.mx) debe autorizar tu cuenta desde su panel de control antes de que puedas ingresar.";
-                        loginInfo.classList.remove('hidden');
-                    }
-                    showToast("Solicitud enviada. En espera de autorización.");
-                    document.getElementById('formRegister').reset();
-                    return;
-                }
-
-                const sessionUser = {
-                    id: newUser.id,
-                    name: newUser.name,
-                    email: newUser.email,
-                    role: 'admin',
-                    status: 'approved',
-                    isAdmin: true
-                };
-
-                completeLogin(sessionUser, 'local-token-' + Date.now(), true);
-                showToast(`¡Cuenta de administrador configurada! Bienvenido, ${newUser.name}`);
+                alertMsg.textContent = err.message || "Error al procesar la solicitud de registro.";
+                alertBox.classList.remove('hidden');
             } finally {
                 submitBtn.disabled = false;
                 btnText.innerHTML = `Enviar Solicitud de Registro`;
@@ -1451,6 +1524,8 @@
         // GESTIÓN DE USUARIOS Y AUTORIZACIÓN (ADMIN)
         // ==========================================
 
+        let usersCloudUnsubscribe = null;
+
         async function openUsersModal() {
             const isMasterAdmin = currentUser && currentUser.email?.toLowerCase() === ADMIN_EMAIL_DEFAULT.toLowerCase();
             if (!isMasterAdmin) {
@@ -1459,49 +1534,40 @@
             }
 
             const tbody = document.getElementById('usersTableBody');
-            tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Cargando solicitudes y usuarios...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Cargando solicitudes en la nube...</td></tr>`;
             openModal('usersModal');
 
             try {
-                let usersList = [];
-                const res = await fetch('/api/users', {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
+                if (firestoreDb) {
+                    await ensureCloudAdmin();
 
-                if (res.ok) {
-                    usersList = await res.json();
-                } else {
-                    throw new Error("API de usuarios no disponible");
+                    // Suscripción en tiempo real a la colección de usuarios
+                    if (usersCloudUnsubscribe) usersCloudUnsubscribe();
+
+                    usersCloudUnsubscribe = firestoreDb.collection("app_users")
+                        .onSnapshot(snapshot => {
+                            const cloudUsers = snapshot.docs.map(doc => {
+                                const data = doc.data();
+                                return {
+                                    id: doc.id,
+                                    email: data.email,
+                                    name: data.name,
+                                    role: data.role,
+                                    status: data.status,
+                                    isAdmin: data.email === ADMIN_EMAIL_DEFAULT,
+                                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
+                                };
+                            });
+                            renderUsersTable(cloudUsers);
+                        }, err => {
+                            console.error("Firestore onSnapshot error:", err);
+                        });
+                    return;
                 }
 
-                renderUsersTable(usersList);
+                throw new Error("Firestore no conectado");
             } catch (e) {
-                // Fallback en almacenamiento local
-                const adminAccount = {
-                    id: 1,
-                    name: "Administrador Principal",
-                    email: ADMIN_EMAIL_DEFAULT,
-                    role: "admin",
-                    status: "approved",
-                    isAdmin: true,
-                    createdAt: new Date().toISOString()
-                };
-
-                const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
-                const otherUsers = localUsers
-                    .filter(u => u.email?.toLowerCase() !== ADMIN_EMAIL_DEFAULT.toLowerCase())
-                    .map(u => ({
-                        id: u.id,
-                        name: u.name,
-                        email: u.email,
-                        role: u.role || 'accountant',
-                        status: u.status || 'pending',
-                        isAdmin: false,
-                        createdAt: u.createdAt || new Date().toISOString()
-                    }));
-
-                const combined = [adminAccount, ...otherUsers];
-                renderUsersTable(combined);
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-red-500">Error al conectar con la base de datos en la nube.</td></tr>`;
             }
         }
 
@@ -1524,11 +1590,11 @@
             }
 
             if (!users || users.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">No hay cuentas ni solicitudes en la base de datos.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">No hay cuentas ni solicitudes en la nube.</td></tr>`;
                 return;
             }
 
-            // Ordenar: primero pendientes, luego resto
+            // Ordenar: primero pendientes, luego orden por fecha
             const sorted = [...users].sort((a, b) => {
                 if (a.status === 'pending' && b.status !== 'pending') return -1;
                 if (a.status !== 'pending' && b.status === 'pending') return 1;
@@ -1555,17 +1621,17 @@
 
                 let actionButtons = '';
                 if (isMasterAdmin) {
-                    actionButtons = `<span class="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-lg inline-flex items-center gap-1"><i class="fa-solid fa-crown text-amber-500"></i> Administrador Designado (Tú)</span>`;
+                    actionButtons = `<span class="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-lg inline-flex items-center gap-1"><i class="fa-solid fa-crown text-amber-500"></i> Administrador Principal (Tú)</span>`;
                 } else if (u.status === 'pending') {
                     actionButtons = `
                         <div class="flex items-center justify-end gap-1.5">
-                            <button type="button" onclick="changeUserStatus(${u.id}, 'approved')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-extrabold transition shadow-sm flex items-center gap-1">
+                            <button type="button" onclick="changeUserStatus('${u.id}', 'approved')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-extrabold transition shadow-sm flex items-center gap-1">
                                 <i class="fa-solid fa-check"></i> Autorizar
                             </button>
-                            <button type="button" onclick="changeUserStatus(${u.id}, 'rejected')" class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1">
+                            <button type="button" onclick="changeUserStatus('${u.id}', 'rejected')" class="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1">
                                 <i class="fa-solid fa-xmark"></i> Rechazar
                             </button>
-                            <button type="button" onclick="deleteUserAccount(${u.id})" title="Eliminar solicitud" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">
+                            <button type="button" onclick="deleteUserAccount('${u.id}')" title="Eliminar solicitud" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">
                                 <i class="fa-regular fa-trash-can text-xs"></i>
                             </button>
                         </div>
@@ -1573,10 +1639,10 @@
                 } else if (u.status === 'approved') {
                     actionButtons = `
                         <div class="flex items-center justify-end gap-1.5">
-                            <button type="button" onclick="changeUserStatus(${u.id}, 'pending')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1">
+                            <button type="button" onclick="changeUserStatus('${u.id}', 'pending')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1">
                                 <i class="fa-solid fa-pause"></i> Suspender
                             </button>
-                            <button type="button" onclick="deleteUserAccount(${u.id})" title="Eliminar usuario" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">
+                            <button type="button" onclick="deleteUserAccount('${u.id}')" title="Eliminar usuario" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">
                                 <i class="fa-regular fa-trash-can text-xs"></i>
                             </button>
                         </div>
@@ -1584,10 +1650,10 @@
                 } else {
                     actionButtons = `
                         <div class="flex items-center justify-end gap-1.5">
-                            <button type="button" onclick="changeUserStatus(${u.id}, 'approved')" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1">
+                            <button type="button" onclick="changeUserStatus('${u.id}', 'approved')" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1">
                                 <i class="fa-solid fa-rotate-left"></i> Reconsiderar / Autorizar
                             </button>
-                            <button type="button" onclick="deleteUserAccount(${u.id})" title="Eliminar usuario" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">
+                            <button type="button" onclick="deleteUserAccount('${u.id}')" title="Eliminar usuario" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition">
                                 <i class="fa-regular fa-trash-can text-xs"></i>
                             </button>
                         </div>
@@ -1614,128 +1680,95 @@
 
         async function changeUserStatus(userId, newStatus) {
             try {
-                const res = await fetch(`/api/users/${userId}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: JSON.stringify({ status: newStatus })
-                });
-
-                if (res.ok) {
-                    showToast(newStatus === 'approved' ? "¡Usuario autorizado con éxito!" : `Estado actualizado a "${newStatus}"`);
-                    openUsersModal();
+                if (firestoreDb) {
+                    await firestoreDb.collection("app_users").doc(userId).update({
+                        status: newStatus,
+                        reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    showToast(newStatus === 'approved' ? "¡Usuario autorizado en la nube con éxito!" : `Estado actualizado a "${newStatus}"`);
                     return;
                 }
-            } catch (e) {}
-
-            // Fallback en almacenamiento local
-            const localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
-            const idx = localUsers.findIndex(u => u.id === userId);
-            if (idx !== -1) {
-                localUsers[idx].status = newStatus;
-                localStorage.setItem('fiscal_local_users', JSON.stringify(localUsers));
-                showToast(newStatus === 'approved' ? "¡Usuario autorizado localmente!" : `Estado local actualizado a "${newStatus}"`);
-                openUsersModal();
+            } catch (e) {
+                console.error("Error changeUserStatus:", e);
+                showToast("Error al actualizar estado en la nube: " + e.message);
             }
         }
 
         async function deleteUserAccount(userId) {
-            if (!confirm("¿Deseas eliminar permanentemente esta cuenta/solicitud?")) return;
+            if (!confirm("¿Deseas eliminar permanentemente esta cuenta/solicitud de la nube?")) return;
 
             try {
-                const res = await fetch(`/api/users/${userId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-
-                if (res.ok) {
-                    showToast("Cuenta eliminada correctamente.");
-                    openUsersModal();
+                if (firestoreDb) {
+                    await firestoreDb.collection("app_users").doc(userId).delete();
+                    showToast("Cuenta eliminada de la nube correctamente.");
                     return;
                 }
-            } catch (e) {}
-
-            // Fallback en almacenamiento local
-            let localUsers = JSON.parse(localStorage.getItem('fiscal_local_users') || '[]');
-            localUsers = localUsers.filter(u => u.id !== userId);
-            localStorage.setItem('fiscal_local_users', JSON.stringify(localUsers));
-            showToast("Cuenta eliminada del almacenamiento local.");
-            openUsersModal();
+            } catch (e) {
+                console.error("Error deleteUserAccount:", e);
+                showToast("Error al eliminar cuenta en la nube: " + e.message);
+            }
         }
 
         async function resetAllAccountsConfirm() {
-            if (!confirm("¿Confirmas eliminar todas las cuentas de la base de datos y conservar ÚNICAMENTE la cuenta del Administrador Principal (" + ADMIN_EMAIL_DEFAULT + ")?")) {
+            if (!confirm("¿Confirmas eliminar todas las cuentas de la nube y conservar ÚNICAMENTE la cuenta del Administrador Principal (" + ADMIN_EMAIL_DEFAULT + ")?")) {
                 return;
             }
 
             try {
-                // Obtener todos los usuarios de la API y eliminar los que no sean admin
-                const res = await fetch('/api/users', {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                if (res.ok) {
-                    const list = await res.json();
-                    for (const u of list) {
-                        if (u.email?.toLowerCase() !== ADMIN_EMAIL_DEFAULT.toLowerCase()) {
-                            await fetch(`/api/users/${u.id}`, {
-                                method: 'DELETE',
-                                headers: { 'Authorization': `Bearer ${authToken}` }
-                            }).catch(() => {});
+                if (firestoreDb) {
+                    const snap = await firestoreDb.collection("app_users").get();
+                    let count = 0;
+                    for (const doc of snap.docs) {
+                        if (doc.data().email?.toLowerCase() !== ADMIN_EMAIL_DEFAULT.toLowerCase()) {
+                            await doc.ref.delete();
+                            count++;
                         }
                     }
+                    showToast(`✓ Se eliminaron ${count} cuentas en la nube. Solo queda el Administrador Principal.`);
+                    return;
                 }
-            } catch (e) {}
-
-            // Limpiar cuentas locales
-            localStorage.setItem('fiscal_local_users', JSON.stringify([]));
-            showToast("✓ Cuentas depuradas. Solo queda la cuenta Administradora Principal.");
-            openUsersModal();
+            } catch (e) {
+                console.error("Error resetAllAccountsConfirm:", e);
+                showToast("Error al purgar cuentas: " + e.message);
+            }
         }
 
         // ==========================================
-        // SINCRONIZACIÓN CON BACKEND (NETLIFY DB / CLIENTS)
+        // SINCRONIZACIÓN DE CLIENTES EN LA NUBE (FIRESTORE)
         // ==========================================
 
         async function syncClientsWithBackend() {
-            if (!currentUser) return;
+            if (!currentUser || !firestoreDb) return;
 
             try {
-                const res = await fetch('/api/clients', {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data) && data.length > 0) {
-                        clientsData = data;
-                        saveToLocalStorage(false);
-                        renderApp();
-                    }
+                const doc = await firestoreDb.collection("padron_fiscal").doc("master_clients").get();
+                if (doc.exists && Array.isArray(doc.data().clients) && doc.data().clients.length > 0) {
+                    clientsData = doc.data().clients;
+                    saveToLocalStorage(false);
+                    renderApp();
+                    console.log("✓ Padrón de clientes sincronizado desde la nube.");
+                } else {
+                    // Inicializar padrón en Firestore
+                    await firestoreDb.collection("padron_fiscal").doc("master_clients").set({
+                        clients: clientsData,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedBy: currentUser?.email || 'admin'
+                    });
                 }
             } catch (err) {
-                // En modo offline o estático se utiliza localStorage de forma transparente
+                console.warn("syncClientsWithBackend notice:", err?.message);
             }
         }
 
         function syncClientsPut(upsertItems, removeIds = []) {
-            if (!currentUser || !authToken) return;
+            if (!currentUser || !firestoreDb) return;
 
-            fetch('/api/clients', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({
-                    upsert: upsertItems || [],
-                    remove: removeIds || []
-                })
-            }).catch(() => {
-                // Silencioso en caso de estar offline
+            firestoreDb.collection("padron_fiscal").doc("master_clients").set({
+                clients: clientsData,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedBy: currentUser.email
+            }).catch(e => {
+                console.warn("syncClientsPut cloud notice:", e?.message);
             });
         }
 
